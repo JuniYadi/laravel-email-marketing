@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Contact extends Model
 {
@@ -60,5 +61,13 @@ class Contact extends Model
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(ContactGroup::class, 'contact_contact_group');
+    }
+
+    /**
+     * Broadcast recipient rows for this contact.
+     */
+    public function broadcastRecipients(): HasMany
+    {
+        return $this->hasMany(BroadcastRecipient::class);
     }
 }
