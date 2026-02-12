@@ -3,6 +3,7 @@
 use App\Models\Contact;
 use App\Models\User;
 use Illuminate\Support\Facades\URL;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -29,10 +30,9 @@ it('marks contact as unsubscribed when confirmed', function () {
 
     expect($contact->isUnsubscribed())->toBeFalse();
 
-    $url = URL::signedRoute('unsubscribe', ['contact' => $contact->id]);
-
-    $this->post($url)
-        ->assertRedirect();
+    Livewire::test('pages::unsubscribe.show', ['contact' => $contact])
+        ->call('unsubscribe')
+        ->assertSet('unsubscribed', true);
 
     $contact->refresh();
     expect($contact->isUnsubscribed())->toBeTrue();

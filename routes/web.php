@@ -24,4 +24,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('templates/{template}/edit', BuilderPage::class)->name('templates.edit');
 });
 
+Route::livewire('unsubscribe/{contact}', 'pages::unsubscribe.show')
+    ->name('unsubscribe')
+    ->middleware('signed');
+
 require __DIR__.'/settings.php';
