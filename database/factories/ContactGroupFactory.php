@@ -1,0 +1,31 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\ContactGroup;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ContactGroup>
+ */
+class ContactGroupFactory extends Factory
+{
+    protected $model = ContactGroup::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'name' => fake()->words(3, true),
+            'reply_to' => fake()->safeEmail(),
+            'from_email_prefix' => fake()->slug(2),
+            'template_id' => fake()->bothify('tpl-####??'),
+            'start_broadcast' => false,
+            'message_per_minutes' => 1,
+        ];
+    }
+}
