@@ -21,11 +21,6 @@ class ContactGroupFactory extends Factory
     {
         return [
             'name' => fake()->words(3, true),
-            'reply_to' => fake()->safeEmail(),
-            'from_email_prefix' => fake()->slug(2),
-            'template_id' => fake()->bothify('tpl-####??'),
-            'start_broadcast' => false,
-            'message_per_minutes' => 1,
         ];
     }
 }
