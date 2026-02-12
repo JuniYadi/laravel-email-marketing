@@ -7,6 +7,7 @@ use App\Http\Requests\StoreSnsWebhookRequest;
 use App\Models\Broadcast;
 use App\Models\BroadcastRecipient;
 use App\Models\BroadcastRecipientEvent;
+use App\Models\Contact;
 use App\Models\SnsWebhookMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -76,6 +77,10 @@ class SnsWebhookController extends Controller
 
         if ($mappedEventType === null) {
             return;
+        }
+
+        if ($eventType === 'complaint') {
+            $this->handleUnsubscribe($decoded);
         }
 
         $mail = (array) ($decoded['mail'] ?? []);
@@ -239,5 +244,18 @@ class SnsWebhookController extends Controller
             'click' => BroadcastRecipientEvent::TYPE_CLICK,
             default => null,
         };
+    }
+
+    protected function handleUnsubscribe(array $message): void
+    {
+        $email = $message['mail']['destination'][0] ?? null;
+
+        if (! $email) {
+            return;
+        }
+
+        Contact::where('email', $email)->update([
+            'unsubscribed_at' => now(),
+        ]);
     }
 }
