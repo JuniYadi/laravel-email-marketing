@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\ContactGroupCountController;
 use App\Http\Controllers\Webhooks\SnsWebhookController;
 use App\Livewire\Templates\BuilderPage;
 use Illuminate\Support\Facades\Route;
@@ -23,8 +22,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('templates', 'pages::templates.index')->name('templates.index');
     Route::livewire('templates/create', BuilderPage::class)->name('templates.create');
     Route::livewire('templates/{template}/edit', BuilderPage::class)->name('templates.edit');
-    Route::get('contact/groups/{group}/count', ContactGroupCountController::class)
-        ->name('contacts.groups.count');
 });
 
 require __DIR__.'/settings.php';
