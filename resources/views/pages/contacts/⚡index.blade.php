@@ -14,11 +14,6 @@ new class extends Component
 
     // Group properties
     public string $groupName = '';
-    public string $groupReplyTo = '';
-    public string $groupFromEmailPrefix = '';
-    public string $groupTemplateId = '';
-    public bool $groupStartBroadcast = false;
-    public int $groupMessagePerMinutes = 1;
 
     // Import properties
     public array $selectedGroupIds = [];
@@ -109,25 +104,13 @@ new class extends Component
     {
         $validated = $this->validate([
             'groupName' => ['required', 'string', 'max:255'],
-            'groupReplyTo' => ['required', 'email'],
-            'groupFromEmailPrefix' => ['required', 'string', 'max:255'],
-            'groupTemplateId' => ['required', 'string', 'max:255'],
-            'groupStartBroadcast' => ['required', 'boolean'],
-            'groupMessagePerMinutes' => ['required', 'integer', 'min:1'],
         ]);
 
         ContactGroup::query()->create([
             'name' => $validated['groupName'],
-            'reply_to' => $validated['groupReplyTo'],
-            'from_email_prefix' => $validated['groupFromEmailPrefix'],
-            'template_id' => $validated['groupTemplateId'],
-            'start_broadcast' => $validated['groupStartBroadcast'],
-            'message_per_minutes' => $validated['groupMessagePerMinutes'],
         ]);
 
-        $this->reset('groupName', 'groupReplyTo', 'groupFromEmailPrefix', 'groupTemplateId');
-        $this->groupStartBroadcast = false;
-        $this->groupMessagePerMinutes = 1;
+        $this->reset('groupName');
         $this->showCreateGroupModal = false;
 
         $this->dispatch('contact-group-created');
@@ -397,7 +380,7 @@ new class extends Component
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <flux:heading size="xl">{{ __('Contacts') }}</flux:heading>
-                <flux:text class="mt-2">{{ __('Create broadcast groups and import contacts from CSV.') }}</flux:text>
+                <flux:text class="mt-2">{{ __('Create reusable contact groups and import contacts from CSV.') }}</flux:text>
             </div>
 
             @if ($activeTab === 'contacts')
@@ -520,12 +503,7 @@ new class extends Component
                             <thead>
                                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
                                     <th class="py-2 pe-3">{{ __('Name') }}</th>
-                                    <th class="py-2 pe-3">{{ __('Reply To') }}</th>
-                                    <th class="py-2 pe-3">{{ __('From Prefix') }}</th>
                                     <th class="py-2 pe-3">{{ __('Contacts') }}</th>
-                                    <th class="py-2 pe-3">{{ __('Template') }}</th>
-                                    <th class="py-2 pe-3">{{ __('Rate') }}</th>
-                                    <th class="py-2 pe-3">{{ __('Status') }}</th>
                                     <th class="py-2">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
@@ -537,18 +515,7 @@ new class extends Component
                                                 {{ $group->name }}
                                             </flux:link>
                                         </td>
-                                        <td class="py-2 pe-3">{{ $group->reply_to }}</td>
-                                        <td class="py-2 pe-3">{{ $group->from_email_prefix }}</td>
                                         <td class="py-2 pe-3">{{ $group->contacts->count() }}</td>
-                                        <td class="py-2 pe-3">{{ $group->template_id }}</td>
-                                        <td class="py-2 pe-3">{{ $group->message_per_minutes }}/min</td>
-                                        <td class="py-2">
-                                            @if ($group->start_broadcast)
-                                                <flux:badge color="emerald" size="sm">{{ __('Active') }}</flux:badge>
-                                            @else
-                                                <flux:badge size="sm">{{ __('Paused') }}</flux:badge>
-                                            @endif
-                                        </td>
                                         <td class="py-2">
                                             <flux:button :href="route('contacts.groups.show', $group)" size="sm" variant="ghost" wire:navigate>
                                                 {{ __('View') }}
@@ -573,15 +540,6 @@ new class extends Component
 
             <form wire:submit="createGroup" class="space-y-4">
                 <flux:input wire:model="groupName" :label="__('Name')" type="text" required autofocus />
-                <flux:input wire:model="groupReplyTo" :label="__('Reply To')" type="email" required />
-                <flux:input wire:model="groupFromEmailPrefix" :label="__('From Email Prefix')" type="text" required />
-                <flux:input wire:model="groupTemplateId" :label="__('Template ID')" type="text" required />
-                <flux:input wire:model="groupMessagePerMinutes" :label="__('Messages Per Minute')" type="number" min="1" required />
-
-                <flux:field>
-                    <flux:label>{{ __('Start Broadcast') }}</flux:label>
-                    <flux:switch wire:model="groupStartBroadcast" />
-                </flux:field>
 
                 <div class="flex items-center justify-end gap-2">
                     <flux:button wire:click="$set('showCreateGroupModal', false)" variant="ghost" type="button">
