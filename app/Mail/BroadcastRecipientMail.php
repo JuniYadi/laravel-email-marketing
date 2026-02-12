@@ -24,6 +24,7 @@ class BroadcastRecipientMail extends Mailable
         public string $replyToAddress,
         /** @var array<string, string> */
         public array $messageMetadata = [],
+        public string $unsubscribeUrl = '',
     ) {}
 
     /**
@@ -58,5 +59,22 @@ class BroadcastRecipientMail extends Mailable
     public function attachments(): array
     {
         return [];
+    }
+
+    /**
+     * Get the message headers.
+     *
+     * @return array<string, string>
+     */
+    public function headers(): array
+    {
+        if ($this->unsubscribeUrl === '') {
+            return [];
+        }
+
+        return [
+            'List-Unsubscribe' => '<'.$this->unsubscribeUrl.'>',
+            'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+        ];
     }
 }

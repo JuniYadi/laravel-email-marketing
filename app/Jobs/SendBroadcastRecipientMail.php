@@ -10,6 +10,7 @@ use App\Support\TemplateRenderer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Throwable;
 
 class SendBroadcastRecipientMail implements ShouldQueue
@@ -72,6 +73,12 @@ class SendBroadcastRecipientMail implements ShouldQueue
         $subject = $renderer->render((string) $broadcast->snapshot_subject, $variables);
         $htmlContent = $renderer->render((string) $broadcast->snapshot_html_content, $variables);
 
+        $unsubscribeUrl = URL::signedRoute(
+            'unsubscribe',
+            ['contact' => $recipient->contact_id],
+            now()->addDays(30)
+        );
+
         try {
             $sentMessage = Mail::to($recipient->email)->send(new BroadcastRecipientMail(
                 subjectLine: $subject,
@@ -84,6 +91,7 @@ class SendBroadcastRecipientMail implements ShouldQueue
                     'broadcast_recipient_id' => (string) $recipient->id,
                     'contact_id' => (string) $recipient->contact_id,
                 ],
+                unsubscribeUrl: $unsubscribeUrl,
             ));
 
             $providerMessageId = null;
