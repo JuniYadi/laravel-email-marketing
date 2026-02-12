@@ -12,5 +12,9 @@ test('authenticated users can visit the dashboard', function () {
     $this->actingAs($user);
 
     $response = $this->get(route('dashboard'));
-    $response->assertOk();
+    $response->assertOk()
+        ->assertSee('Dashboard Overview')
+        ->assertSee('Daily Email Performance')
+        ->assertSee('data-dashboard-chart', escape: false)
+        ->assertSee('data-chart-payload', escape: false);
 });

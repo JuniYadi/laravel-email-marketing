@@ -16,21 +16,11 @@ it('allows creating a contact group from livewire page', function () {
 
     Livewire::test('pages::contacts.index')
         ->set('groupName', 'Marketing Group')
-        ->set('groupReplyTo', 'reply@example.com')
-        ->set('groupFromEmailPrefix', 'marketing')
-        ->set('groupTemplateId', 'tpl-abc123')
-        ->set('groupStartBroadcast', true)
-        ->set('groupMessagePerMinutes', 5)
         ->call('createGroup')
         ->assertHasNoErrors();
 
     $this->assertDatabaseHas('contact_groups', [
         'name' => 'Marketing Group',
-        'reply_to' => 'reply@example.com',
-        'from_email_prefix' => 'marketing',
-        'template_id' => 'tpl-abc123',
-        'start_broadcast' => 1,
-        'message_per_minutes' => 5,
     ]);
 });
 

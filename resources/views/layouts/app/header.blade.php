@@ -16,6 +16,12 @@
                 <flux:navbar.item icon="users" :href="route('contacts.index')" :current="request()->routeIs('contacts.index')" wire:navigate>
                     {{ __('Contacts') }}
                 </flux:navbar.item>
+                <flux:navbar.item icon="megaphone" :href="route('broadcasts.index')" :current="request()->routeIs('broadcasts.index')" wire:navigate>
+                    {{ __('Broadcasts') }}
+                </flux:navbar.item>
+                <flux:navbar.item icon="clock" :href="route('broadcasts.history')" :current="request()->routeIs('broadcasts.history')" wire:navigate>
+                    {{ __('Broadcast History') }}
+                </flux:navbar.item>
                 <flux:navbar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                     {{ __('Templates') }}
                 </flux:navbar.item>
@@ -64,6 +70,12 @@
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="users" :href="route('contacts.index')" :current="request()->routeIs('contacts.index')" wire:navigate>
                         {{ __('Contacts') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="megaphone" :href="route('broadcasts.index')" :current="request()->routeIs('broadcasts.index')" wire:navigate>
+                        {{ __('Broadcasts') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clock" :href="route('broadcasts.history')" :current="request()->routeIs('broadcasts.history')" wire:navigate>
+                        {{ __('Broadcast History') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}

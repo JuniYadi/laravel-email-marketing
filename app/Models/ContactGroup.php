@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ContactGroup extends Model
 {
@@ -18,24 +19,7 @@ class ContactGroup extends Model
      */
     protected $fillable = [
         'name',
-        'reply_to',
-        'from_email_prefix',
-        'template_id',
-        'start_broadcast',
-        'message_per_minutes',
     ];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'start_broadcast' => 'boolean',
-        ];
-    }
 
     /**
      * The contacts assigned to this group.
@@ -43,5 +27,13 @@ class ContactGroup extends Model
     public function contacts(): BelongsToMany
     {
         return $this->belongsToMany(Contact::class, 'contact_contact_group');
+    }
+
+    /**
+     * Broadcasts configured for this group.
+     */
+    public function broadcasts(): HasMany
+    {
+        return $this->hasMany(Broadcast::class);
     }
 }

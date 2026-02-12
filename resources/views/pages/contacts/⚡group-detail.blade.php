@@ -203,38 +203,14 @@ new class extends Component
         <!-- Group Details Card -->
         <div class="rounded-xl border border-zinc-200 p-6 dark:border-zinc-700">
             <flux:heading size="lg" class="mb-4">{{ __('Group Details') }}</flux:heading>
-            <div class="grid gap-4 md:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-2">
                 <div>
                     <flux:text>{{ __('Name') }}</flux:text>
                     <flux:heading size="md">{{ $group->name }}</flux:heading>
                 </div>
                 <div>
-                    <flux:text>{{ __('Reply To') }}</flux:text>
-                    <flux:heading size="md">{{ $group->reply_to }}</flux:heading>
-                </div>
-                <div>
-                    <flux:text>{{ __('From Prefix') }}</flux:text>
-                    <flux:heading size="md">{{ $group->from_email_prefix }}</flux:heading>
-                </div>
-                <div>
                     <flux:text>{{ __('Total Contacts') }}</flux:text>
                     <flux:heading size="md">{{ $this->contactCount }}</flux:heading>
-                </div>
-                <div>
-                    <flux:text>{{ __('Template') }}</flux:text>
-                    <flux:heading size="md">{{ $group->template_id }}</flux:heading>
-                </div>
-                <div>
-                    <flux:text>{{ __('Rate') }}</flux:text>
-                    <flux:heading size="md">{{ $group->message_per_minutes }}/min</flux:heading>
-                </div>
-                <div>
-                    <flux:text>{{ __('Status') }}</flux:text>
-                    @if ($group->start_broadcast)
-                        <flux:badge color="emerald" size="md">{{ __('Active') }}</flux:badge>
-                    @else
-                        <flux:badge size="md">{{ __('Paused') }}</flux:badge>
-                    @endif
                 </div>
             </div>
         </div>
