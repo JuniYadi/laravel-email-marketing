@@ -101,12 +101,13 @@ class DispatchBroadcastsCommand extends Command
     }
 
     /**
-     * Generate recipients for valid contacts in the broadcast group.
+     * Generate recipients for valid, subscribed contacts in the broadcast group.
      */
     protected function ensureRecipientsForGroup(Broadcast $broadcast): void
     {
         $contacts = $broadcast->group
             ->contacts()
+            ->subscribed()
             ->where('contacts.is_invalid', false)
             ->select('contacts.id', 'contacts.email')
             ->get();
