@@ -1,5 +1,10 @@
 <?php
 
+use App\Models\Broadcast;
+use App\Models\BroadcastRecipient;
+use App\Models\Contact;
+use App\Models\ContactGroup;
+use App\Models\EmailTemplate;
 use App\Models\SnsWebhookMessage;
 
 it('stores detailed notification payload from sns webhooks', function () {
@@ -77,4 +82,68 @@ it('stores subscription confirmation metadata for later processing', function ()
         'token' => 'subscription-token',
         'subscribe_url' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
     ]);
+});
+
+it('maps sns delivery events into broadcast recipient tracking', function () {
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+    $contact = Contact::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+    ]);
+
+    $recipient = BroadcastRecipient::factory()->create([
+        'broadcast_id' => $broadcast->id,
+        'contact_id' => $contact->id,
+        'email' => $contact->email,
+        'status' => 'sent',
+    ]);
+
+    $payload = [
+        'Type' => 'Notification',
+        'MessageId' => 'sns-message-3',
+        'TopicArn' => 'arn:aws:sns:us-east-1:123456789012:marketing-events',
+        'Message' => json_encode([
+            'eventType' => 'Delivery',
+            'mail' => [
+                'messageId' => 'ses-message-1',
+                'timestamp' => '2026-02-12T10:05:00.000Z',
+                'tags' => [
+                    'broadcast_id' => [(string) $broadcast->id],
+                    'broadcast_recipient_id' => [(string) $recipient->id],
+                ],
+            ],
+            'delivery' => [
+                'timestamp' => '2026-02-12T10:06:00.000Z',
+            ],
+        ], JSON_THROW_ON_ERROR),
+        'Timestamp' => '2026-02-12T10:06:30.000Z',
+        'SignatureVersion' => '1',
+        'Signature' => 'sample-signature',
+        'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
+    ];
+
+    $response = $this->postJson('/webhooks/sns', $payload);
+
+    $response
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'Notification',
+        ]);
+
+    $this->assertDatabaseHas('broadcast_recipient_events', [
+        'broadcast_id' => $broadcast->id,
+        'broadcast_recipient_id' => $recipient->id,
+        'provider_message_id' => 'ses-message-1',
+        'event_type' => 'delivery',
+    ]);
+
+    $recipient->refresh();
+
+    expect($recipient->status)->toBe('delivered')
+        ->and($recipient->provider_message_id)->toBe('ses-message-1')
+        ->and($recipient->delivered_at)->not->toBeNull();
 });

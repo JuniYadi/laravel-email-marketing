@@ -22,11 +22,12 @@ it('allows a contact to belong to multiple groups', function () {
         ->and($groups->first()->contacts()->count())->toBe(1);
 });
 
-it('stores group broadcast defaults', function () {
-    $group = ContactGroup::factory()->create();
+it('stores contact group name', function () {
+    $group = ContactGroup::factory()->create([
+        'name' => 'Newsletter Leads',
+    ]);
 
-    expect($group->start_broadcast)->toBeFalse()
-        ->and($group->message_per_minutes)->toBe(1);
+    expect($group->name)->toBe('Newsletter Leads');
 });
 
 it('stores optional company and invalid status for contacts', function () {
