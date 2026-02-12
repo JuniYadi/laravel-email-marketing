@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ class Contact extends Model
         'last_name',
         'company',
         'is_invalid',
+        'unsubscribed_at',
     ];
 
     /**
@@ -42,6 +44,7 @@ class Contact extends Model
     {
         return [
             'is_invalid' => 'boolean',
+            'unsubscribed_at' => 'datetime',
         ];
     }
 
@@ -69,5 +72,15 @@ class Contact extends Model
     public function broadcastRecipients(): HasMany
     {
         return $this->hasMany(BroadcastRecipient::class);
+    }
+
+    public function isUnsubscribed(): bool
+    {
+        return $this->unsubscribed_at !== null;
+    }
+
+    public function scopeSubscribed(Builder $query): Builder
+    {
+        return $query->whereNull('unsubscribed_at');
     }
 }
