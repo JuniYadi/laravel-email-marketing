@@ -55,11 +55,8 @@ ENV PHP_EXT_bcmath=1
 ENV PHP_EXT_pgsql=1
 ENV PHP_EXT_pdo_pgsql=1
 
-# Install supervisord and netcat for health checks
-RUN apt-get update && apt-get install -y supervisor netcat-openbsd && rm -rf /var/lib/apt/lists/*
-
-# Create supervisor log directory
-RUN mkdir -p /var/log/supervisor
+# Install supervisord, cron, and netcat for health checks
+RUN apt-get update && apt-get install -y supervisor cron netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 # Copy built application from builder
 COPY --from=builder --chown=www-data:www-data /app /var/www/html
@@ -72,6 +69,10 @@ COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
 
 # Copy supervisord configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy crontab file
+COPY docker/crontab /etc/cron.d/laravel
+RUN chmod 0644 /etc/cron.d/laravel && crontab /etc/cron.d/laravel
 
 # Copy entrypoint script
 COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

@@ -1,0 +1,3 @@
+# Laravel Scheduler - runs every minute
+# Output is redirected to supervisor's stdout for Docker logging
+* * * * * www-data cd /var/www/html && php artisan schedule:run >> /proc/1/fd/1 2>&1

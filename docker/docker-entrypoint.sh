@@ -24,7 +24,6 @@ mkdir -p /var/www/html/storage/framework/sessions
 mkdir -p /var/www/html/storage/framework/views
 mkdir -p /var/www/html/storage/logs
 mkdir -p /var/www/html/bootstrap/cache
-mkdir -p /var/log/supervisor
 
 # Fix permissions for writable directories
 chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
@@ -79,7 +78,7 @@ fi
 echo "Starting Laravel Marketing Mail..."
 echo "  - PHP-FPM on unix socket"
 echo "  - Nginx on port 80"
-echo "  - Laravel Scheduler (every minute)"
+echo "  - Cron (Laravel Scheduler runs every minute)"
 echo "  - Laravel Queue Worker"
 
 exec "$@"
