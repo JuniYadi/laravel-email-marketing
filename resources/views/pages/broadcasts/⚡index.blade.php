@@ -27,6 +27,28 @@ new class extends Component
 
     public string $duplicateSnapshotChoice = 'template';
 
+    public bool $showEditBroadcastModal = false;
+
+    public ?int $editingBroadcastId = null;
+
+    public string $editBroadcastName = '';
+
+    public string $editBroadcastGroupId = '';
+
+    public string $editBroadcastTemplateId = '';
+
+    public string $editBroadcastReplyTo = '';
+
+    public string $editBroadcastFromName = '';
+
+    public string $editBroadcastFromPrefix = '';
+
+    public string $editBroadcastFromDomain = '';
+
+    public int $editBroadcastMessagesPerMinute = 1;
+
+    public string $editBroadcastStartsAt = '';
+
     public string $broadcastName = '';
 
     public string $broadcastGroupId = '';
