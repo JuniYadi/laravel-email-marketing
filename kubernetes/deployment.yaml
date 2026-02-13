@@ -1,0 +1,190 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketing-mail
+  namespace: marketing-mail
+  labels:
+    app: marketing-mail
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: marketing-mail
+  template:
+    metadata:
+      labels:
+        app: marketing-mail
+    spec:
+      serviceAccountName: marketing-mail-sa
+      containers:
+      - name: app
+        image: ghcr.io/juniyadi/laravel-marketing-mail:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: marketing-mail-config
+        - secretRef:
+            name: marketing-mail-secret
+        env:
+        # AWS credentials are automatically injected by IRSA
+        # via environment variables and mounted token file
+        - name: AWS_ROLE_ARN
+          value: "arn:aws:iam::ACCOUNT_ID:role/marketing-mail-eks-pod-role"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: aws-iam-token
+          mountPath: /var/run/secrets/eks.amazonaws.com/serviceaccount
+          readOnly: true
+      volumes:
+      - name: aws-iam-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: sts.amazonaws.com
+              expirationSeconds: 86400
+              path: token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketing-mail-worker
+  namespace: marketing-mail
+  labels:
+    app: marketing-mail-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marketing-mail-worker
+  template:
+    metadata:
+      labels:
+        app: marketing-mail-worker
+    spec:
+      serviceAccountName: marketing-mail-sa
+      containers:
+      - name: queue-worker
+        image: ghcr.io/juniyadi/laravel-marketing-mail:latest
+        imagePullPolicy: Always
+        command: ["php", "artisan", "queue:work"]
+        args:
+        - "--tries=3"
+        - "--timeout=300"
+        - "--sleep=3"
+        - "--max-jobs=1000"
+        - "--max-time=3600"
+        envFrom:
+        - configMapRef:
+            name: marketing-mail-config
+        - secretRef:
+            name: marketing-mail-secret
+        env:
+        - name: AWS_ROLE_ARN
+          value: "arn:aws:iam::ACCOUNT_ID:role/marketing-mail-eks-pod-role"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        volumeMounts:
+        - name: aws-iam-token
+          mountPath: /var/run/secrets/eks.amazonaws.com/serviceaccount
+          readOnly: true
+      volumes:
+      - name: aws-iam-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: sts.amazonaws.com
+              expirationSeconds: 86400
+              path: token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketing-mail-scheduler
+  namespace: marketing-mail
+  labels:
+    app: marketing-mail-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marketing-mail-scheduler
+  template:
+    metadata:
+      labels:
+        app: marketing-mail-scheduler
+    spec:
+      serviceAccountName: marketing-mail-sa
+      containers:
+      - name: scheduler
+        image: ghcr.io/juniyadi/laravel-marketing-mail:latest
+        imagePullPolicy: Always
+        command: ["php", "artisan", "schedule:work"]
+        envFrom:
+        - configMapRef:
+            name: marketing-mail-config
+        - secretRef:
+            name: marketing-mail-secret
+        env:
+        - name: AWS_ROLE_ARN
+          value: "arn:aws:iam::ACCOUNT_ID:role/marketing-mail-eks-pod-role"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: aws-iam-token
+          mountPath: /var/run/secrets/eks.amazonaws.com/serviceaccount
+          readOnly: true
+      volumes:
+      - name: aws-iam-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: sts.amazonaws.com
+              expirationSeconds: 86400
+              path: token

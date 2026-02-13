@@ -25,6 +25,15 @@ services:
       - DB_DATABASE=marketing_mail
       - DB_USERNAME=marketing
       - DB_PASSWORD=secret
+      # AWS Configuration (optional - for S3 and SES)
+      # Uncomment and set these if using AWS services
+      # - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      # - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      # - AWS_DEFAULT_REGION=us-east-1
+      # - AWS_BUCKET=your-marketing-mail-bucket
+      # - FILESYSTEM_DISK=s3
+      # - MAIL_MAILER=ses
+      # - MAIL_FROM_ADDRESS=noreply@yourdomain.com
       # php-base extensions
       - PHP_EXT_bcmath=1
       - PHP_EXT_pgsql=1

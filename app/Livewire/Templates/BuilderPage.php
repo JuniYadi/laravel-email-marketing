@@ -231,8 +231,12 @@ class BuilderPage extends Component
             return;
         }
 
-        $path = $file->store(path: 'email-templates', options: 'public');
-        $url = Storage::disk('public')->url($path);
+        // Use configured filesystem disk (supports local, public, or s3)
+        $disk = config('filesystems.default');
+        $path = $file->store(path: 'email-templates', options: $disk);
+
+        // Generate public URL for the stored file
+        $url = Storage::disk($disk)->url($path);
 
         $element = $this->rows[$rowIndex]['columns'][$columnIndex]['elements'][$elementIndex];
 
