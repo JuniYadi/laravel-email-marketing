@@ -14,6 +14,13 @@ A powerful, self-hosted email marketing solution built with Laravel 12. Manage c
 
 ## Features
 
+### Authentication
+- Flexible authentication with Laravel Fortify
+- Google OAuth integration (optional)
+- Two-factor authentication (2FA) support
+- Email verification
+- Password reset functionality
+
 ### Contact Management
 - Organize contacts into groups/segments
 - CSV import for bulk contact upload
@@ -192,6 +199,89 @@ docker-compose --env-file .env up -d
 |---------|-----|
 | Application | http://localhost:8080 |
 | phpMyAdmin | http://localhost:8081 |
+
+---
+
+## Google OAuth Setup (Optional)
+
+This application supports Google OAuth authentication with three configurable modes:
+
+### Authentication Modes
+
+| Mode | Description |
+|------|-------------|
+| `both` | Users can authenticate via Google OAuth **or** email/password (default) |
+| `google_only` | Only Google OAuth authentication is allowed |
+| `manual_only` | Only email/password authentication is allowed |
+
+### Setup Steps
+
+#### 1. Create Google OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create a new project or select an existing one
+3. Navigate to **APIs & Services** → **Credentials**
+4. Click **Create Credentials** → **OAuth 2.0 Client ID**
+5. Configure the OAuth consent screen if you haven't already
+6. Select **Web application** as the application type
+7. Add authorized redirect URI:
+   ```
+   http://localhost:8080/auth/google/callback  # For local development
+   https://yourdomain.com/auth/google/callback # For production
+   ```
+8. Save the **Client ID** and **Client Secret**
+
+#### 2. Configure Environment Variables
+
+Add the following to your `.env` file:
+
+```env
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
+
+# Authentication Mode (both|google_only|manual_only)
+AUTH_MODE=both
+```
+
+#### 3. Test Google OAuth
+
+1. Start your application
+2. Navigate to `/login`
+3. Click the **Continue with Google** button
+4. Authorize with your Google account
+5. You should be redirected back and logged in
+
+### Features
+
+- **Smart Account Linking**: Automatically links Google accounts to existing users with the same email address
+- **Email Verification**: Trust Google's email verification (no need for separate email confirmation)
+- **Encrypted Token Storage**: Google tokens are encrypted in the database
+- **Avatar Sync**: Automatically syncs profile pictures from Google
+- **Secure Password Handling**: Prevents password login for Google-only accounts
+
+### Docker Configuration
+
+If using Docker, add these environment variables to your `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${APP_URL}/auth/google/callback
+      - AUTH_MODE=both
+```
+
+Then update your `.env` file:
+
+```bash
+echo "GOOGLE_CLIENT_ID=your-client-id" >> .env
+echo "GOOGLE_CLIENT_SECRET=your-secret" >> .env
+echo "AUTH_MODE=both" >> .env
+```
 
 ---
 
@@ -451,6 +541,10 @@ php artisan queue:work
 | `MAIL_FROM_NAME` | Sender name | No |
 | `QUEUE_CONNECTION` | Queue driver (database/redis) | No |
 | `BROADCAST_ALLOWED_DOMAINS` | Allowed sender domains | No |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No (OAuth) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | No (OAuth) |
+| `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No (OAuth) |
+| `AUTH_MODE` | Authentication mode (both/google_only/manual_only) | No |
 
 ---
 

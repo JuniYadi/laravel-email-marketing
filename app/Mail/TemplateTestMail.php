@@ -16,8 +16,7 @@ class TemplateTestMail extends Mailable
     public function __construct(
         public string $subjectLine,
         public string $htmlContent,
-    ) {
-    }
+    ) {}
 
     public function build(): static
     {
