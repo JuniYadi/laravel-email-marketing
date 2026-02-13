@@ -1,0 +1,65 @@
+# ===============================================
+# Docker Compose for Laravel Marketing Mail
+# ===============================================
+# Use this for local development and testing
+# Run: docker-compose up -d
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: laravel-marketing-mail:latest
+    container_name: marketing-mail-app
+    restart: unless-stopped
+    ports:
+      - "8084:80"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=http://localhost:8084
+      # Database connection (PostgreSQL)
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=marketing_mail
+      - DB_USERNAME=marketing
+      - DB_PASSWORD=secret
+      # php-base extensions
+      - PHP_EXT_bcmath=1
+      - PHP_EXT_pgsql=1
+      - PHP_EXT_pdo_pgsql=1
+      # Optional: Run migrations on startup
+      - RUN_MIGRATIONS=true
+    volumes:
+      - ./storage:/var/www/html/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - marketing-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: marketing-mail-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=marketing_mail
+      - POSTGRES_USER=marketing
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketing -d marketing_mail"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - marketing-network
+
+volumes:
+  postgres_data:
+
+networks:
+  marketing-network:
+    driver: bridge
