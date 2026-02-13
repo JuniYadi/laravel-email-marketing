@@ -162,3 +162,34 @@ it('builds full daily chart series and maps reject to send-failed events', funct
         ->and(array_sum($datasets['open']['data'] ?? []))->toBe(1)
         ->and(array_sum($datasets['click']['data'] ?? []))->toBe(1);
 });
+
+it('downloads dashboard metrics as csv', function () {
+    $this->actingAs(User::factory()->create());
+
+    $testable = Livewire::test('pages::dashboard.index')
+        ->call('exportCsv')
+        ->assertFileDownloaded();
+
+    $response = $testable->instance()->exportCsv();
+
+    ob_start();
+    $response->sendContent();
+    $csv = (string) ob_get_clean();
+
+    $lines = array_values(array_filter(explode("\n", trim($csv))));
+    $header = str_getcsv($lines[0]);
+
+    expect($header)->toBe([
+        'date',
+        'send',
+        'delivered',
+        'bounce',
+        'reject',
+        'complaint',
+        'open',
+        'click',
+    ]);
+
+    $firstDataRow = str_getcsv($lines[1]);
+    expect(count($firstDataRow))->toBe(8);
+});
