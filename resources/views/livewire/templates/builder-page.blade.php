@@ -320,7 +320,7 @@
                             <flux:button 
                                 variant="primary" 
                                 type="submit"
-                                :disabled="$wire.is_over_attachment_limit"
+                                {{ $isOverLimit ? 'disabled' : '' }}
                             >
                                 {{ $isEditing ? __('Update Template') : __('Save Template') }}
                             </flux:button>
