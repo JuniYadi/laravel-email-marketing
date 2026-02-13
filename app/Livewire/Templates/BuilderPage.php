@@ -421,6 +421,14 @@ class BuilderPage extends Component
             'attachments.*.size' => ['required', 'integer', 'max:'.EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES],
         ]);
 
+        // Validate total attachment size
+        $totalSize = collect($this->attachments)->sum('size');
+        if ($totalSize > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
+            throw ValidationException::withMessages([
+                'attachments' => __('Total attachment size exceeds 40MB limit.'),
+            ]);
+        }
+
         $attributes = [
             'name' => $validated['name'],
             'subject' => $validated['subject'],

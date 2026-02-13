@@ -168,6 +168,33 @@ test('continueToBuilder validates attachment size does not exceed limit', functi
         ->assertHasErrors(['attachments.0.size']);
 });
 
+test('continueToBuilder validates total attachment size does not exceed limit', function (): void {
+    $maxSize = EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
+
+    $attachments = [
+        [
+            'id' => 'att-1',
+            'name' => 'file1.pdf',
+            'path' => 'attachments/file1.pdf',
+            'size' => ($maxSize / 2) + 1,
+        ],
+        [
+            'id' => 'att-2',
+            'name' => 'file2.pdf',
+            'path' => 'attachments/file2.pdf',
+            'size' => ($maxSize / 2) + 1,
+        ],
+    ];
+
+    Livewire::test(BuilderPage::class)
+        ->set('name', 'Test Template')
+        ->set('subject', 'Test Subject')
+        ->set('theme.content_width', 640)
+        ->set('attachments', $attachments)
+        ->call('continueToBuilder')
+        ->assertHasErrors(['attachments']);
+});
+
 test('continueToBuilder saves attachments to new template', function (): void {
     $attachments = [
         [
