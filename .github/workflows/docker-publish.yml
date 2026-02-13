@@ -2,7 +2,8 @@
 # GitHub Actions Workflow - Docker Image Build
 # ===============================================
 # Triggers on git tags matching v*.*.* (e.g., v1.0.0)
-# Builds and pushes Docker images to GitHub Container Registry
+# Runs linting and tests before building and pushing Docker images
+# Ensures code quality and tests pass before deployment
 #
 # Architecture: Parallel builds for AMD64 and ARM64
 # - AMD64 builds on ubuntu-24.04 (native x86_64)
@@ -22,11 +23,89 @@ env:
 
 jobs:
   # -----------------------------------------------
-  # Job 1: Prepare Metadata
+  # Job 1: Lint Code
+  # -----------------------------------------------
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    environment: Testing
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Add Flux Credentials Loaded From ENV
+        run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
+
+      - name: Install Dependencies
+        run: |
+          composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+          npm install
+
+      - name: Run Pint
+        run: composer lint
+
+  # -----------------------------------------------
+  # Job 2: Run Tests
+  # -----------------------------------------------
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    environment: Testing
+    strategy:
+      matrix:
+        php-version: ['8.4', '8.5']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Node Dependencies
+        run: npm i
+
+      - name: Add Flux Credentials Loaded From ENV
+        run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Run Tests
+        run: ./vendor/bin/pest
+
+  # -----------------------------------------------
+  # Job 3: Prepare Metadata
   # -----------------------------------------------
   prepare:
     name: Prepare Metadata
     runs-on: ubuntu-latest
+
+    needs: [lint, test]
 
     permissions:
       contents: read
@@ -61,7 +140,7 @@ jobs:
             org.opencontainers.image.description=${{ steps.tag-description.outputs.description }}
 
   # -----------------------------------------------
-  # Job 2: Build AMD64 Platform
+  # Job 4: Build AMD64 Platform
   # -----------------------------------------------
   build-amd64:
     name: Build AMD64
@@ -106,7 +185,7 @@ jobs:
           echo "AMD64 image digest: ${{ steps.build.outputs.digest }}"
 
   # -----------------------------------------------
-  # Job 3: Build ARM64 Platform
+  # Job 5: Build ARM64 Platform
   # -----------------------------------------------
   build-arm64:
     name: Build ARM64
@@ -151,7 +230,7 @@ jobs:
           echo "ARM64 image digest: ${{ steps.build.outputs.digest }}"
 
   # -----------------------------------------------
-  # Job 4: Merge Manifests
+  # Job 6: Merge Manifests
   # -----------------------------------------------
   manifest:
     name: Create Multi-Arch Manifest
