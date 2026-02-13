@@ -23,6 +23,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'email_verified_at',
+        'google_id',
+        'google_token',
+        'google_refresh_token',
+        'avatar',
     ];
 
     /**
@@ -32,6 +37,8 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'google_token',
+        'google_refresh_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
@@ -47,6 +54,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'google_token' => 'encrypted',
+            'google_refresh_token' => 'encrypted',
         ];
     }
 
@@ -60,5 +69,41 @@ class User extends Authenticatable
             ->take(2)
             ->map(fn ($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+    /**
+     * Check if user has a linked Google account
+     */
+    public function hasGoogleAccount(): bool
+    {
+        return ! is_null($this->google_id);
+    }
+
+    /**
+     * Check if user has a password set
+     */
+    public function hasPassword(): bool
+    {
+        return ! is_null($this->password);
+    }
+
+    /**
+     * Get the authentication method for this user
+     */
+    public function authenticationMethod(): string
+    {
+        if ($this->hasGoogleAccount() && $this->hasPassword()) {
+            return 'both';
+        }
+
+        if ($this->hasGoogleAccount()) {
+            return 'google';
+        }
+
+        if ($this->hasPassword()) {
+            return 'password';
+        }
+
+        return 'none';
     }
 }

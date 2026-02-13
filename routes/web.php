@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Webhooks\SnsWebhookController;
 use App\Livewire\Templates\BuilderPage;
 use Illuminate\Support\Facades\Route;
@@ -7,6 +8,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+// Google OAuth Routes
+Route::middleware(['guest', 'auth.mode'])->group(function () {
+    Route::get('auth/google/redirect', [GoogleAuthController::class, 'redirect'])
+        ->name('auth.google.redirect');
+    Route::get('auth/google/callback', [GoogleAuthController::class, 'callback'])
+        ->name('auth.google.callback');
+});
 
 Route::livewire('dashboard', 'pages::dashboard.index')
     ->middleware(['auth', 'verified'])

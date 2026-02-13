@@ -112,4 +112,20 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Mode
+    |--------------------------------------------------------------------------
+    |
+    | This option defines which authentication methods are available for users.
+    | Supported modes: "both", "google_only", "manual_only"
+    |
+    | - both: Users can authenticate with Google OAuth or email/password
+    | - google_only: Only Google OAuth authentication is allowed
+    | - manual_only: Only email/password authentication is allowed
+    |
+    */
+
+    'mode' => env('AUTH_MODE', 'both'),
+
 ];
