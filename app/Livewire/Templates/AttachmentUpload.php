@@ -60,9 +60,17 @@ class AttachmentUpload extends Component
             return;
         }
 
+        // Check if adding this file would exceed the 40MB total limit
+        $futureTotal = $this->getTotalSizeProperty() + $file->getSize();
+        if ($futureTotal > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
+            $this->addError('newAttachments.'.$index, 'Adding this file would exceed the 40MB total limit.');
+
+            return;
+        }
+
         // Store file on default disk
         $disk = config('filesystems.default');
-        $path = $file->store('template-attachments', $disk);
+        $path = Storage::disk($disk)->putFile('template-attachments', $file);
 
         $this->attachments[] = [
             'id' => (string) str()->ulid(),
@@ -136,7 +144,12 @@ class AttachmentUpload extends Component
 
     public function getProgressPercentageProperty(): float
     {
-        return min(100, ($this->getTotalSizeProperty() / EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) * 100);
+        $maxSize = EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
+        if ($maxSize === 0) {
+            return 0.0;
+        }
+
+        return min(100, ($this->getTotalSizeProperty() / $maxSize) * 100);
     }
 
     public function render(): \Illuminate\Contracts\View\View
