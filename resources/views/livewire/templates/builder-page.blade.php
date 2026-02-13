@@ -299,12 +299,7 @@
                             </div>
                         @endif
 
-                        @php
-                            $totalSize = collect($attachments)->sum('size');
-                            $isOverLimit = $totalSize > \App\Models\EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
-                        @endphp
-
-                        @if ($isOverLimit)
+                        @if ($this->isOverAttachmentLimit)
                             <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
                                 <div class="flex items-center text-red-700 dark:text-red-400">
                                     <flux:icon.exclamation-triangle class="w-5 h-5 mr-2" />
@@ -320,7 +315,7 @@
                             <flux:button 
                                 variant="primary" 
                                 type="submit"
-                                {{ $isOverLimit ? 'disabled' : '' }}
+                                x-bind:disabled="$wire.isOverAttachmentLimit"
                             >
                                 {{ $isEditing ? __('Update Template') : __('Save Template') }}
                             </flux:button>
