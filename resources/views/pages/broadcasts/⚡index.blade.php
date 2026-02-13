@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
@@ -350,6 +351,84 @@ new class extends Component
     }
 
     /**
+     * Export broadcast list with progress and status to CSV.
+     */
+    public function exportCsv(): StreamedResponse
+    {
+        $filename = sprintf('broadcasts-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'id',
+                'name',
+                'group_id',
+                'group_name',
+                'template_id',
+                'template_name',
+                'messages_per_minute',
+                'starts_at',
+                'processed_recipients_count',
+                'total_recipients_count',
+                'status',
+                'reply_to',
+                'from_name',
+                'from_email',
+                'created_at',
+            ], ',', '"', '');
+
+            Broadcast::query()
+                ->with(['group:id,name', 'template:id,name'])
+                ->withCount([
+                    'recipients as total_recipients_count',
+                    'recipients as processed_recipients_count' => function ($query): void {
+                        $query->whereIn('status', [
+                            BroadcastRecipient::STATUS_SENT,
+                            BroadcastRecipient::STATUS_DELIVERED,
+                            BroadcastRecipient::STATUS_OPENED,
+                            BroadcastRecipient::STATUS_CLICKED,
+                            BroadcastRecipient::STATUS_FAILED,
+                            BroadcastRecipient::STATUS_BOUNCED,
+                            BroadcastRecipient::STATUS_COMPLAINED,
+                            BroadcastRecipient::STATUS_SKIPPED,
+                        ]);
+                    },
+                ])
+                ->orderBy('id')
+                ->chunkById(500, function (Collection $broadcasts) use ($handle): void {
+                    foreach ($broadcasts as $broadcast) {
+                        fputcsv($handle, [
+                            $broadcast->id,
+                            $broadcast->name,
+                            $broadcast->contact_group_id,
+                            $broadcast->group?->name,
+                            $broadcast->email_template_id,
+                            $broadcast->template?->name,
+                            $broadcast->messages_per_minute,
+                            $broadcast->starts_at?->format('Y-m-d H:i:s'),
+                            (int) $broadcast->processed_recipients_count,
+                            (int) $broadcast->total_recipients_count,
+                            $broadcast->status,
+                            $broadcast->reply_to,
+                            $broadcast->from_name,
+                            $broadcast->from_email,
+                            $broadcast->created_at?->format('Y-m-d H:i:s'),
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
      * Reset create broadcast form fields.
      */
     protected function resetBroadcastForm(): void
@@ -453,9 +532,14 @@ new class extends Component
                 <flux:text class="mt-2">{{ __('Schedule, rate-limit, and track email sends per group.') }}</flux:text>
             </div>
 
-            <flux:button wire:click="openCreateBroadcastModal" variant="primary">
-                {{ __('Create Broadcast') }}
-            </flux:button>
+            <div class="flex flex-wrap items-center gap-2">
+                <flux:button wire:click="exportCsv" variant="outline" icon="arrow-down-tray">
+                    {{ __('Export CSV') }}
+                </flux:button>
+                <flux:button wire:click="openCreateBroadcastModal" variant="primary">
+                    {{ __('Create Broadcast') }}
+                </flux:button>
+            </div>
         </div>
 
         <div class="rounded-xl border border-zinc-200 p-6 dark:border-zinc-700">
