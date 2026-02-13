@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component {
     public bool $showPreviewModal = false;
@@ -69,6 +70,54 @@ new class extends Component {
     {
         return EmailTemplate::query()->latest()->get();
     }
+
+    /**
+     * Export templates metadata to CSV.
+     */
+    public function exportCsv(): StreamedResponse
+    {
+        $filename = sprintf('email-templates-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'id',
+                'name',
+                'subject',
+                'version',
+                'type',
+                'is_active',
+                'created_at',
+                'updated_at',
+            ], ',', '"', '');
+
+            EmailTemplate::query()
+                ->orderBy('id')
+                ->chunkById(500, function (Collection $templates) use ($handle): void {
+                    foreach ($templates as $template) {
+                        fputcsv($handle, [
+                            $template->id,
+                            $template->name,
+                            $template->subject,
+                            $template->version,
+                            is_array($template->builder_schema) ? 'visual' : 'raw',
+                            $template->is_active ? '1' : '0',
+                            $template->created_at?->format('Y-m-d H:i:s'),
+                            $template->updated_at?->format('Y-m-d H:i:s'),
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
 }; ?>
 
 <section class="w-full">
@@ -79,9 +128,14 @@ new class extends Component {
                 <flux:text class="mt-2">{{ __('Design and preview real HTML templates with dynamic placeholders.') }}</flux:text>
             </div>
 
-            <flux:button :href="route('templates.create')" variant="primary" wire:navigate>
-                {{ __('New Template') }}
-            </flux:button>
+            <div class="flex flex-wrap items-center gap-2">
+                <flux:button wire:click="exportCsv" variant="outline" icon="arrow-down-tray">
+                    {{ __('Export CSV') }}
+                </flux:button>
+                <flux:button :href="route('templates.create')" variant="primary" wire:navigate>
+                    {{ __('New Template') }}
+                </flux:button>
+            </div>
         </div>
 
         <div class="rounded-xl border border-zinc-200 p-6 dark:border-zinc-700">
