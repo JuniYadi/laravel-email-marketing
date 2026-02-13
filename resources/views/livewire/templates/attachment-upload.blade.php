@@ -39,20 +39,14 @@
 
     {{-- File upload input --}}
     <div>
-        <flux:label>Upload Attachments</flux:label>
-        <flux:description class="mt-1">
-            Allowed files: PDF, Word (DOC, DOCX), Excel (XLS, XLSX), PowerPoint (PPT, PPTX). Max 40MB total.
-        </flux:description>
-        
-        <div class="mt-2">
-            <input
-                type="file"
-                wire:model="newAttachments"
-                multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                class="block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
-            >
-        </div>
+        <flux:input 
+            type="file" 
+            wire:model="newAttachments" 
+            label="Upload Attachments"
+            description="Allowed files: PDF, Word (DOC, DOCX), Excel (XLS, XLSX), PowerPoint (PPT, PPTX). Max 40MB total."
+            multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+        />
         
         @error('newAttachments.*')
             <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
