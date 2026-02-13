@@ -299,11 +299,24 @@
                             </div>
                         @endif
 
+                        @if ($this->isOverAttachmentLimit)
+                            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                                <div class="flex items-center text-red-700 dark:text-red-400">
+                                    <flux:icon.exclamation-triangle class="w-5 h-5 mr-2" />
+                                    <span class="text-sm font-medium">{{ __('Cannot save: Total attachment size exceeds 40MB limit.') }}</span>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="mt-6 flex items-center justify-end gap-2">
                             <flux:button :href="route('templates.index')" variant="ghost" type="button">
                                 {{ __('Cancel') }}
                             </flux:button>
-                            <flux:button variant="primary" type="submit">
+                            <flux:button 
+                                variant="primary" 
+                                type="submit"
+                                :disabled="$wire.isOverAttachmentLimit"
+                            >
                                 {{ $isEditing ? __('Update Template') : __('Save Template') }}
                             </flux:button>
                         </div>
