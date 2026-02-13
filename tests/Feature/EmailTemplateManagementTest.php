@@ -34,6 +34,8 @@ it('renders template create page for authenticated users', function () {
         ->assertSee('Create Template')
         ->assertSee('Step 1 of 2')
         ->assertSee('Continue to Builder')
+        ->assertSee('xl:grid-cols-[1fr_320px]', false)
+        ->assertSee('items-center justify-center text-center', false)
         ->assertDontSee('Rows');
 });
 
@@ -77,6 +79,81 @@ it('opens existing template on build step and can go back to setup', function ()
         ->assertSet('currentStep', 2)
         ->call('backToSetup')
         ->assertSet('currentStep', 1);
+});
+
+it('shows consistent top step navigation actions', function () {
+    $this->actingAs(User::factory()->create());
+
+    $template = EmailTemplate::factory()->create([
+        'builder_schema' => [
+            'schema_version' => 2,
+            'meta' => ['template_name' => 'x', 'template_key' => 'welcome'],
+            'theme' => [],
+            'rows' => [
+                [
+                    'columns' => [
+                        [
+                            'width' => '100%',
+                            'elements' => [
+                                ['type' => 'text', 'content' => ['text' => 'Welcome']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    Livewire::test(BuilderPage::class, ['template' => $template])
+        ->assertSet('currentStep', 2)
+        ->assertSee('Back to Setup')
+        ->assertDontSee('Go to Canvas')
+        ->call('backToSetup')
+        ->assertSet('currentStep', 1)
+        ->assertSee('Go to Canvas');
+});
+
+it('shows simplified step 2 controls with always-visible mode', function () {
+    $this->actingAs(User::factory()->create());
+
+    $template = EmailTemplate::factory()->create([
+        'builder_schema' => [
+            'schema_version' => 2,
+            'meta' => ['template_name' => 'x', 'template_key' => 'welcome'],
+            'theme' => [],
+            'rows' => [
+                [
+                    'columns' => [
+                        [
+                            'width' => '100%',
+                            'elements' => [
+                                ['type' => 'text', 'content' => ['text' => 'Welcome']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    Livewire::test(BuilderPage::class, ['template' => $template])
+        ->assertSet('currentStep', 2)
+        ->assertSet('sidebarTab', 'layout')
+        ->assertSee('Mode')
+        ->assertSee('Layout')
+        ->assertSee('Elements')
+        ->assertDontSee('Starter')
+        ->assertDontSee('Settings')
+        ->assertDontSee('Content Width');
+});
+
+it('normalizes invalid sidebar tab values back to layout', function () {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(BuilderPage::class)
+        ->set('currentStep', 2)
+        ->set('sidebarTab', 'settings')
+        ->assertSet('sidebarTab', 'layout');
 });
 
 it('downloads templates as csv', function () {
