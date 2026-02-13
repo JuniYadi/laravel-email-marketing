@@ -17,7 +17,15 @@ new class extends Component
 
     public bool $showRecipientsModal = false;
 
+    public bool $showDuplicateModal = false;
+
     public ?int $activeBroadcastId = null;
+
+    public ?int $duplicateBroadcastId = null;
+
+    public string $duplicateName = '';
+
+    public string $duplicateSnapshotChoice = 'template';
 
     public string $broadcastName = '';
 
@@ -159,6 +167,53 @@ new class extends Component
     {
         $this->activeBroadcastId = $broadcastId;
         $this->showRecipientsModal = true;
+    }
+
+    /**
+     * Open duplicate modal for a broadcast.
+     */
+    public function openDuplicateModal(int $broadcastId): void
+    {
+        $broadcast = Broadcast::query()->findOrFail($broadcastId);
+
+        $this->duplicateBroadcastId = $broadcast->id;
+        $this->duplicateName = $broadcast->name;
+        $this->duplicateSnapshotChoice = 'template';
+        $this->showDuplicateModal = true;
+    }
+
+    /**
+     * Duplicate a broadcast.
+     */
+    public function duplicateBroadcast(): void
+    {
+        $validated = $this->validate([
+            'duplicateName' => ['required', 'string', 'max:255'],
+        ]);
+
+        $original = Broadcast::query()->findOrFail($this->duplicateBroadcastId);
+
+        $copySnapshots = $this->duplicateSnapshotChoice === 'original';
+
+        Broadcast::query()->create([
+            'name' => $validated['duplicateName'],
+            'contact_group_id' => $original->contact_group_id,
+            'email_template_id' => $original->email_template_id,
+            'status' => Broadcast::STATUS_DRAFT,
+            'messages_per_minute' => $original->messages_per_minute,
+            'reply_to' => $original->reply_to,
+            'from_name' => $original->from_name,
+            'from_prefix' => $original->from_prefix,
+            'from_domain' => $original->from_domain,
+            'snapshot_subject' => $copySnapshots ? $original->snapshot_subject : null,
+            'snapshot_html_content' => $copySnapshots ? $original->snapshot_html_content : null,
+            'snapshot_builder_schema' => $copySnapshots ? $original->snapshot_builder_schema : null,
+            'snapshot_template_version' => $copySnapshots ? $original->snapshot_template_version : null,
+        ]);
+
+        $this->reset('duplicateBroadcastId', 'duplicateName', 'duplicateSnapshotChoice');
+        $this->showDuplicateModal = false;
+        $this->dispatch('broadcast-created');
     }
 
     /**
@@ -357,6 +412,9 @@ new class extends Component
                                     </td>
                                     <td class="py-2">
                                         <div class="flex flex-wrap gap-2">
+                                            <flux:button wire:click="openDuplicateModal({{ $broadcast->id }})" size="sm" variant="ghost">
+                                                <flux:icon name="document-duplicate" class="w-4 h-4" />
+                                            </flux:button>
                                             <flux:button wire:click="openRecipientsModal({{ $broadcast->id }})" size="sm" variant="ghost">
                                                 {{ __('Recipients') }}
                                             </flux:button>
@@ -515,6 +573,40 @@ new class extends Component
             @else
                 <flux:text>{{ __('No recipients found for this broadcast yet.') }}</flux:text>
             @endif
+        </div>
+    </flux:modal>
+
+    <flux:modal wire:model="showDuplicateModal" class="max-w-lg">
+        <div class="space-y-4">
+            <flux:heading>{{ __('Duplicate Broadcast') }}</flux:heading>
+
+            <form wire:submit="duplicateBroadcast" class="space-y-4">
+                <flux:input wire:model="duplicateName" :label="__('Name')" type="text" required autofocus />
+
+                <flux:field>
+                    <flux:label>{{ __('Email Content') }}</flux:label>
+                    <flux:radio.group wire:model="duplicateSnapshotChoice" class="flex flex-col gap-3">
+                        <flux:radio value="template" label="{{ __('Use current template version') }}" />
+                        <flux:text class="mt-[-8px] ml-6 text-sm text-zinc-500">
+                            {{ __('Gets latest subject and content from the template') }}
+                        </flux:text>
+
+                        <flux:radio value="original" label="{{ __('Use original email content') }}" />
+                        <flux:text class="mt-[-8px] ml-6 text-sm text-zinc-500">
+                            {{ __('Preserves exact email from this broadcast') }}
+                        </flux:text>
+                    </flux:radio.group>
+                </flux:field>
+
+                <div class="flex items-center justify-end gap-2">
+                    <flux:button wire:click="$set('showDuplicateModal', false)" variant="ghost" type="button">
+                        {{ __('Cancel') }}
+                    </flux:button>
+                    <flux:button variant="primary" type="submit">
+                        {{ __('Duplicate') }}
+                    </flux:button>
+                </div>
+            </form>
         </div>
     </flux:modal>
 </section>
