@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Livewire\Templates;
+
+use App\Models\EmailTemplate;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Component;
+use Livewire\WithFileUploads;
+
+class AttachmentUpload extends Component
+{
+    use WithFileUploads;
+
+    public ?int $templateId = null;
+
+    public array $attachments = [];
+
+    /**
+     * @var array<int, UploadedFile>
+     */
+    public array $newAttachments = [];
+
+    public function mount(?int $templateId = null): void
+    {
+        $this->templateId = $templateId;
+
+        if ($templateId !== null) {
+            $template = EmailTemplate::query()->find($templateId);
+            if ($template !== null) {
+                $this->attachments = $template->attachments ?? [];
+            }
+        }
+    }
+
+    public function updatedNewAttachments(): void
+    {
+        $this->validate([
+            'newAttachments.*' => [
+                'file',
+                'max:40960', // 40MB per file
+                'mimetypes:'.implode(',', EmailTemplate::ALLOWED_ATTACHMENT_MIME_TYPES),
+                'mimes:'.implode(',', EmailTemplate::ALLOWED_ATTACHMENT_EXTENSIONS),
+            ],
+        ], [
+            'newAttachments.*.mimetypes' => 'The file must be a PDF, Word document, Excel spreadsheet, or PowerPoint presentation.',
+            'newAttachments.*.mimes' => 'Invalid file extension. Allowed: pdf, docx, doc, xlsx, xls, pptx, ppt',
+        ]);
+    }
+
+    public function addAttachment(int $index): void
+    {
+        if (! isset($this->newAttachments[$index])) {
+            return;
+        }
+
+        $file = $this->newAttachments[$index];
+
+        if (! $file instanceof UploadedFile) {
+            return;
+        }
+
+        // Store file on default disk
+        $disk = config('filesystems.default');
+        $path = $file->store('template-attachments', $disk);
+
+        $this->attachments[] = [
+            'id' => (string) str()->ulid(),
+            'name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'disk' => $disk,
+            'size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'uploaded_at' => now()->toIso8601String(),
+        ];
+
+        unset($this->newAttachments[$index]);
+        $this->newAttachments = array_values($this->newAttachments);
+
+        $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
+    }
+
+    public function removeAttachment(string $attachmentId): void
+    {
+        $index = collect($this->attachments)->search(fn (array $a): bool => $a['id'] === $attachmentId);
+
+        if ($index === false) {
+            return;
+        }
+
+        $attachment = $this->attachments[$index];
+
+        // Delete file from storage
+        if (isset($attachment['path']) && isset($attachment['disk'])) {
+            Storage::disk($attachment['disk'])->delete($attachment['path']);
+        }
+
+        unset($this->attachments[$index]);
+        $this->attachments = array_values($this->attachments);
+
+        $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
+    }
+
+    public function getTotalSizeProperty(): int
+    {
+        return collect($this->attachments)->sum('size');
+    }
+
+    public function getTotalSizeFormattedProperty(): string
+    {
+        $size = $this->getTotalSizeProperty();
+        if ($size === 0) {
+            return '0 B';
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $unitIndex = 0;
+
+        while ($size >= 1024 && $unitIndex < count($units) - 1) {
+            $size /= 1024;
+            $unitIndex++;
+        }
+
+        return round($size, 2).' '.$units[$unitIndex];
+    }
+
+    public function getIsOverLimitProperty(): bool
+    {
+        return $this->getTotalSizeProperty() > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
+    }
+
+    public function getRemainingSizeProperty(): int
+    {
+        return max(0, EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES - $this->getTotalSizeProperty());
+    }
+
+    public function getProgressPercentageProperty(): float
+    {
+        return min(100, ($this->getTotalSizeProperty() / EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) * 100);
+    }
+
+    public function render(): \Illuminate\Contracts\View\View
+    {
+        return view('livewire.templates.attachment-upload');
+    }
+}
