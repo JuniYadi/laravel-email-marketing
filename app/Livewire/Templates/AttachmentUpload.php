@@ -21,6 +21,16 @@ class AttachmentUpload extends Component
      */
     public array $newAttachments = [];
 
+    public int $totalSize = 0;
+
+    public string $totalSizeFormatted = '0 B';
+
+    public bool $isOverLimit = false;
+
+    public float $progressPercentage = 0.0;
+
+    public int $remainingSize = 0;
+
     public function mount(?int $templateId = null): void
     {
         $this->templateId = $templateId;
@@ -30,6 +40,54 @@ class AttachmentUpload extends Component
             if ($template !== null) {
                 $this->attachments = $template->attachments ?? [];
             }
+        }
+
+        $this->updateCalculatedProperties();
+    }
+
+    /**
+     * Livewire lifecycle hook - called when properties are updated.
+     */
+    public function updatedAttachments(): void
+    {
+        $this->updateCalculatedProperties();
+    }
+
+    /**
+     * Update all calculated properties based on current attachments.
+     */
+    protected function updateCalculatedProperties(): void
+    {
+        $this->totalSize = collect($this->attachments)->sum('size');
+
+        // Update total size formatted
+        if ($this->totalSize === 0) {
+            $this->totalSizeFormatted = '0 B';
+        } else {
+            $units = ['B', 'KB', 'MB', 'GB'];
+            $unitIndex = 0;
+            $size = $this->totalSize;
+
+            while ($size >= 1024 && $unitIndex < count($units) - 1) {
+                $size /= 1024;
+                $unitIndex++;
+            }
+
+            $this->totalSizeFormatted = round($size, 2).' '.$units[$unitIndex];
+        }
+
+        // Update is over limit
+        $this->isOverLimit = $this->totalSize > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
+
+        // Update remaining size
+        $this->remainingSize = max(0, EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES - $this->totalSize);
+
+        // Update progress percentage
+        $maxSize = EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
+        if ($maxSize === 0) {
+            $this->progressPercentage = 0.0;
+        } else {
+            $this->progressPercentage = min(100, ($this->totalSize / $maxSize) * 100);
         }
     }
 
@@ -61,7 +119,8 @@ class AttachmentUpload extends Component
         }
 
         // Check if adding this file would exceed the 40MB total limit
-        $futureTotal = $this->getTotalSizeProperty() + $file->getSize();
+        $currentTotal = collect($this->attachments)->sum('size');
+        $futureTotal = $currentTotal + $file->getSize();
         if ($futureTotal > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
             $this->addError('newAttachments.'.$index, 'Adding this file would exceed the 40MB total limit.');
 
@@ -85,6 +144,7 @@ class AttachmentUpload extends Component
         unset($this->newAttachments[$index]);
         $this->newAttachments = array_values($this->newAttachments);
 
+        $this->updateCalculatedProperties();
         $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
     }
 
@@ -106,6 +166,7 @@ class AttachmentUpload extends Component
         unset($this->attachments[$index]);
         $this->attachments = array_values($this->attachments);
 
+        $this->updateCalculatedProperties();
         $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
     }
 
@@ -141,7 +202,8 @@ class AttachmentUpload extends Component
             }
 
             // Check if adding this file would exceed the 40MB total limit
-            $futureTotal = $this->getTotalSizeProperty() + $file->getSize();
+            $currentTotal = collect($this->attachments)->sum('size');
+            $futureTotal = $currentTotal + $file->getSize();
             if ($futureTotal > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
                 $skippedCount++;
                 $skippedFiles[] = $file->getClientOriginalName();
@@ -179,50 +241,8 @@ class AttachmentUpload extends Component
             $this->addError('newAttachments', $message);
         }
 
+        $this->updateCalculatedProperties();
         $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
-    }
-
-    public function getTotalSizeProperty(): int
-    {
-        return collect($this->attachments)->sum('size');
-    }
-
-    public function getTotalSizeFormattedProperty(): string
-    {
-        $size = $this->getTotalSizeProperty();
-        if ($size === 0) {
-            return '0 B';
-        }
-
-        $units = ['B', 'KB', 'MB', 'GB'];
-        $unitIndex = 0;
-
-        while ($size >= 1024 && $unitIndex < count($units) - 1) {
-            $size /= 1024;
-            $unitIndex++;
-        }
-
-        return round($size, 2).' '.$units[$unitIndex];
-    }
-
-    public function getIsOverLimitProperty(): bool
-    {
-        return $this->getTotalSizeProperty() > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
-    }
-
-    public function getRemainingSizeProperty(): int
-    {
-        return max(0, EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES - $this->getTotalSizeProperty());
-    }
-
-    public function getProgressPercentageProperty(): float
-    {
-        $maxSize = EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
-        if ($maxSize === 0) {
-            return 0.0;
-        }
-
-        return min(100, ($this->getTotalSizeProperty() / $maxSize) * 100);
     }
 
     public function render(): \Illuminate\Contracts\View\View
