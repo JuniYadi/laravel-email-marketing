@@ -18,17 +18,34 @@
     </div>
 
     <div class="space-y-3">
-        <flux:heading size="sm">{{ __('Theme') }}</flux:heading>
-        <flux:input wire:model="theme.content_width" :label="__('Content Width')" type="number" min="480" max="760" />
-        <flux:input wire:model="theme.font_family" :label="__('Font Family')" type="text" />
-        <div class="grid grid-cols-2 gap-3">
-            <flux:input wire:model="theme.background_color" :label="__('Background')" type="color" />
-            <flux:input wire:model="theme.surface_color" :label="__('Surface')" type="color" />
-            <flux:input wire:model="theme.text_color" :label="__('Text')" type="color" />
-            <flux:input wire:model="theme.link_color" :label="__('Link')" type="color" />
-            <flux:input wire:model="theme.button_bg_color" :label="__('Button BG')" type="color" />
-            <flux:input wire:model="theme.button_text_color" :label="__('Button Text')" type="color" />
+        <div class="flex items-center justify-between">
+            <flux:heading size="sm">{{ __('Theme') }}</flux:heading>
+            <flux:button 
+                type="button" 
+                size="xs" 
+                variant="ghost"
+                wire:click="toggleThemeSettings"
+            >
+                @if($showThemeSettings) 
+                    {{ __('Hide') }}
+                @else 
+                    {{ __('Show') }}
+                @endif
+            </flux:button>
         </div>
+        
+        @if($showThemeSettings)
+            <flux:input wire:model="theme.content_width" :label="__('Content Width')" type="number" min="480" max="760" />
+            <flux:input wire:model="theme.font_family" :label="__('Font Family')" type="text" />
+            <div class="grid grid-cols-2 gap-3">
+                <flux:input wire:model="theme.background_color" :label="__('Background')" type="color" />
+                <flux:input wire:model="theme.surface_color" :label="__('Surface')" type="color" />
+                <flux:input wire:model="theme.text_color" :label="__('Text')" type="color" />
+                <flux:input wire:model="theme.link_color" :label="__('Link')" type="color" />
+                <flux:input wire:model="theme.button_bg_color" :label="__('Button BG')" type="color" />
+                <flux:input wire:model="theme.button_text_color" :label="__('Button Text')" type="color" />
+            </div>
+        @endif
     </div>
 
     {{-- Attachments Section --}}

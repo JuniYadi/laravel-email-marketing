@@ -52,6 +52,8 @@ class BuilderPage extends Component
      */
     public array $theme = [];
 
+    public bool $showThemeSettings = true;
+
     /**
      * @var array<int, array<string, mixed>>
      */
@@ -229,6 +231,11 @@ class BuilderPage extends Component
         if (! in_array($sidebarTab, ['layout', 'elements'], true)) {
             $this->sidebarTab = 'layout';
         }
+    }
+
+    public function toggleThemeSettings(): void
+    {
+        $this->showThemeSettings = ! $this->showThemeSettings;
     }
 
     public function updatedImageUploads(mixed $value, string $key): void
