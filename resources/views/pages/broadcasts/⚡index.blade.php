@@ -513,25 +513,10 @@ new class extends Component
                                         @endif
                                     </td>
                                     <td class="py-2">
-                                        <div class="flex flex-wrap gap-2">
-                                            <flux:button wire:click="openDuplicateModal({{ $broadcast->id }})" size="sm" variant="ghost">
-                                                <flux:icon name="document-duplicate" class="w-4 h-4" />
-                                            </flux:button>
-                                            <flux:button wire:click="openRecipientsModal({{ $broadcast->id }})" size="sm" variant="ghost">
-                                                {{ __('Recipients') }}
-                                            </flux:button>
-                                            <flux:button :href="route('broadcasts.history', ['broadcast_id' => $broadcast->id])" wire:navigate size="sm" variant="ghost">
-                                                {{ __('History') }}
-                                            </flux:button>
-                                            <flux:button wire:click="requeueBroadcast({{ $broadcast->id }})" size="sm" variant="outline">
-                                                {{ __('Requeue') }}
-                                            </flux:button>
+                                        <div class="flex items-center gap-2">
                                             @if ($broadcast->status === Broadcast::STATUS_SCHEDULED)
                                                 <flux:button wire:click="startBroadcast({{ $broadcast->id }})" size="sm" variant="primary">
                                                     {{ __('Start') }}
-                                                </flux:button>
-                                                <flux:button wire:click="cancelBroadcast({{ $broadcast->id }})" size="sm" variant="ghost">
-                                                    {{ __('Cancel') }}
                                                 </flux:button>
                                             @elseif ($broadcast->status === Broadcast::STATUS_RUNNING)
                                                 <flux:button wire:click="pauseBroadcast({{ $broadcast->id }})" size="sm" variant="ghost">
@@ -541,10 +526,45 @@ new class extends Component
                                                 <flux:button wire:click="resumeBroadcast({{ $broadcast->id }})" size="sm" variant="primary">
                                                     {{ __('Resume') }}
                                                 </flux:button>
-                                                <flux:button wire:click="cancelBroadcast({{ $broadcast->id }})" size="sm" variant="ghost">
-                                                    {{ __('Cancel') }}
-                                                </flux:button>
                                             @endif
+
+                                            <flux:dropdown position="bottom" align="end">
+                                                <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" />
+
+                                                <flux:menu>
+                                                    @if (in_array($broadcast->status, [Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED]))
+                                                        <flux:menu.item wire:click="openEditBroadcastModal({{ $broadcast->id }})" icon="pencil">
+                                                            {{ __('Edit') }}
+                                                        </flux:menu.item>
+                                                    @endif
+
+                                                    <flux:menu.item wire:click="openDuplicateModal({{ $broadcast->id }})" icon="document-duplicate">
+                                                        {{ __('Duplicate') }}
+                                                    </flux:menu.item>
+
+                                                    <flux:menu.item wire:click="openRecipientsModal({{ $broadcast->id }})" icon="users">
+                                                        {{ __('Recipients') }}
+                                                    </flux:menu.item>
+
+                                                    <flux:menu.item :href="route('broadcasts.history', ['broadcast_id' => $broadcast->id])" icon="clock" wire:navigate>
+                                                        {{ __('History') }}
+                                                    </flux:menu.item>
+
+                                                    @if (in_array($broadcast->status, [Broadcast::STATUS_COMPLETED, Broadcast::STATUS_PAUSED]))
+                                                        <flux:menu.separator />
+                                                        <flux:menu.item wire:click="requeueBroadcast({{ $broadcast->id }})" icon="arrow-path">
+                                                            {{ __('Requeue Failed') }}
+                                                        </flux:menu.item>
+                                                    @endif
+
+                                                    @if (in_array($broadcast->status, [Broadcast::STATUS_SCHEDULED, Broadcast::STATUS_PAUSED]))
+                                                        <flux:menu.separator />
+                                                        <flux:menu.item wire:click="cancelBroadcast({{ $broadcast->id }})" icon="x-mark">
+                                                            {{ __('Cancel Broadcast') }}
+                                                        </flux:menu.item>
+                                                    @endif
+                                                </flux:menu>
+                                            </flux:dropdown>
                                         </div>
                                     </td>
                                 </tr>
@@ -706,6 +726,77 @@ new class extends Component
                     </flux:button>
                     <flux:button variant="primary" type="submit">
                         {{ __('Duplicate') }}
+                    </flux:button>
+                </div>
+            </form>
+        </div>
+    </flux:modal>
+
+    <flux:modal wire:model="showEditBroadcastModal" class="max-w-2xl">
+        <div class="space-y-4">
+            <flux:heading>{{ __('Edit Broadcast') }}</flux:heading>
+
+            <form wire:submit="updateBroadcast" class="space-y-4">
+                <flux:input wire:model="editBroadcastName" :label="__('Name')" type="text" required autofocus />
+
+                <flux:field>
+                    <flux:label>{{ __('Group') }}</flux:label>
+                    <flux:select wire:model="editBroadcastGroupId" required>
+                        <flux:select.option value="">{{ __('Choose Group') }}</flux:select.option>
+                        @foreach ($this->groups as $group)
+                            <flux:select.option wire:key="edit-broadcast-group-{{ $group->id }}" value="{{ $group->id }}">
+                                {{ $group->name }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="editBroadcastGroupId" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('Template') }}</flux:label>
+                    <flux:select wire:model="editBroadcastTemplateId" required>
+                        <flux:select.option value="">{{ __('Choose Template') }}</flux:select.option>
+                        @foreach ($this->templates as $template)
+                            <flux:select.option wire:key="edit-broadcast-template-{{ $template->id }}" value="{{ $template->id }}">
+                                {{ $template->name }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="editBroadcastTemplateId" />
+                </flux:field>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <flux:input wire:model="editBroadcastReplyTo" :label="__('Reply To')" type="email" required />
+                    <flux:input wire:model="editBroadcastFromName" :label="__('From Name')" type="text" required />
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <flux:input wire:model="editBroadcastFromPrefix" :label="__('From Prefix')" type="text" required />
+
+                    <flux:field>
+                        <flux:label>{{ __('From Domain') }}</flux:label>
+                        <flux:select wire:model="editBroadcastFromDomain" required>
+                            @foreach ($this->allowedDomains as $domain)
+                                <flux:select.option wire:key="edit-broadcast-domain-{{ $domain }}" value="{{ $domain }}">
+                                    {{ $domain }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:error name="editBroadcastFromDomain" />
+                    </flux:field>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <flux:input wire:model="editBroadcastMessagesPerMinute" :label="__('Messages Per Minute')" type="number" min="1" required />
+                    <flux:input wire:model="editBroadcastStartsAt" :label="__('Starts At')" type="datetime-local" required />
+                </div>
+
+                <div class="flex items-center justify-end gap-2">
+                    <flux:button wire:click="$set('showEditBroadcastModal', false)" variant="ghost" type="button">
+                        {{ __('Cancel') }}
+                    </flux:button>
+                    <flux:button variant="primary" type="submit">
+                        {{ __('Update Broadcast') }}
                     </flux:button>
                 </div>
             </form>
