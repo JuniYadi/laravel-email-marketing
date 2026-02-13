@@ -406,3 +406,21 @@ it('validates prefix format on edit', function () {
         ->call('updateBroadcast')
         ->assertHasErrors('editBroadcastFromPrefix');
 });
+
+it('downloads broadcasts as csv', function () {
+    config()->set('broadcast.allowed_domains', ['marketing.test.com']);
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->call('exportCsv')
+        ->assertFileDownloaded();
+});
