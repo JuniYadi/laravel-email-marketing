@@ -8,10 +8,16 @@ use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 class BroadcastRecipientMail extends Mailable
 {
     use Queueable, SerializesModels;
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    public array $attachmentData = [];
 
     /**
      * Create a new message instance.
@@ -25,7 +31,10 @@ class BroadcastRecipientMail extends Mailable
         /** @var array<string, string> */
         public array $messageMetadata = [],
         public string $unsubscribeUrl = '',
-    ) {}
+        array $attachments = [],
+    ) {
+        $this->attachmentData = $attachments;
+    }
 
     /**
      * Get the message envelope.
@@ -54,11 +63,29 @@ class BroadcastRecipientMail extends Mailable
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, \Illuminate\Mail\Attachment>
      */
     public function attachments(): array
     {
-        return [];
+        $attachments = [];
+
+        foreach ($this->attachmentData as $attachment) {
+            if (! isset($attachment['path']) || ! isset($attachment['disk'])) {
+                continue;
+            }
+
+            $attachmentPath = Storage::disk($attachment['disk'])->path($attachment['path']);
+
+            if (! file_exists($attachmentPath)) {
+                continue;
+            }
+
+            $attachments[] = \Illuminate\Mail\Attachment::fromPath($attachmentPath)
+                ->as($attachment['name'] ?? basename($attachment['path']))
+                ->withMime($attachment['mime_type'] ?? 'application/octet-stream');
+        }
+
+        return $attachments;
     }
 
     /**
