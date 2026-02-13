@@ -33,7 +33,7 @@ class BuilderPage extends Component
 
     public string $workspaceTab = 'builder';
 
-    public string $sidebarTab = 'rows';
+    public string $sidebarTab = 'layout';
 
     public string $mode = 'visual';
 
@@ -200,6 +200,13 @@ class BuilderPage extends Component
         if ($this->mode === 'visual') {
             $this->applyStarterTemplate($templateKey);
             $this->captureHistory();
+        }
+    }
+
+    public function updatedSidebarTab(string $sidebarTab): void
+    {
+        if (! in_array($sidebarTab, ['layout', 'elements'], true)) {
+            $this->sidebarTab = 'layout';
         }
     }
 
