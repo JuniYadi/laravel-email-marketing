@@ -54,25 +54,60 @@
 
         {{-- Pending uploads --}}
         @if (count($newAttachments) > 0)
-            <div class="mt-3 space-y-2">
-                <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Files ready to upload:</p>
-                @foreach ($newAttachments as $index => $file)
-                    <div class="flex items-center justify-between p-2 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                        <div class="flex items-center space-x-3">
-                            <flux:icon.document class="w-5 h-5 text-zinc-400" />
-                            <span class="text-sm text-zinc-700 dark:text-zinc-300">{{ $file->getClientOriginalName() }}</span>
-                            <span class="text-xs text-zinc-500">({{ round($file->getSize() / 1024 / 1024, 2) }} MB)</span>
-                        </div>
+            <div class="mt-3 space-y-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                        Files ready to upload ({{ count($newAttachments) }}):
+                    </p>
+                    <div class="flex gap-2">
                         <flux:button 
-                            wire:click="addAttachment({{ $index }})" 
+                            wire:click="addAllAttachments" 
                             size="sm" 
                             variant="primary"
                             :disabled="$this->isOverLimit"
                         >
-                            Add
+                            <flux:icon.check class="w-4 h-4 mr-1" />
+                            Add All
+                        </flux:button>
+                        <flux:button 
+                            wire:click="clearNewAttachments" 
+                            size="sm" 
+                            variant="ghost"
+                        >
+                            <flux:icon.x-mark class="w-4 h-4 mr-1" />
+                            Clear All
                         </flux:button>
                     </div>
-                @endforeach
+                </div>
+
+                @error('newAttachments')
+                    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-900/20 dark:border-yellow-800">
+                        <div class="flex items-start text-yellow-700 dark:text-yellow-400">
+                            <flux:icon.exclamation-triangle class="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                            <span class="text-sm">{{ $message }}</span>
+                        </div>
+                    </div>
+                @enderror
+
+                <div class="space-y-2">
+                    @foreach ($newAttachments as $index => $file)
+                        <div class="flex items-center justify-between p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                            <div class="flex items-center space-x-3 min-w-0 flex-1">
+                                <flux:icon.document class="w-5 h-5 text-zinc-400 flex-shrink-0" />
+                                <span class="text-sm text-zinc-700 dark:text-zinc-300 truncate">{{ $file->getClientOriginalName() }}</span>
+                                <span class="text-xs text-zinc-500 flex-shrink-0">({{ round($file->getSize() / 1024 / 1024, 2) }} MB)</span>
+                            </div>
+                            <flux:button 
+                                wire:click="removeNewAttachment({{ $index }})" 
+                                size="sm" 
+                                variant="ghost"
+                                class="text-red-600 hover:text-red-700 flex-shrink-0"
+                            >
+                                <flux:icon.trash class="w-4 h-4" />
+                            </flux:button>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         @endif
     </div>

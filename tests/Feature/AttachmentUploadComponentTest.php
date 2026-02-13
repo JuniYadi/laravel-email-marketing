@@ -342,3 +342,176 @@ it('handles division by zero in progress percentage calculation', function () {
     expect($component->get('progressPercentage'))->toBeGreaterThanOrEqual(0.0);
     expect($component->get('progressPercentage'))->toBeLessThanOrEqual(100.0);
 });
+
+it('removes a pending file from newAttachments array', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file1 = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+    $file2 = UploadedFile::fake()->create('doc2.pdf', 1024, 'application/pdf');
+
+    $component = Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file1, $file2])
+        ->assertCount('newAttachments', 2)
+        ->call('removeNewAttachment', 0)
+        ->assertCount('newAttachments', 1);
+
+    // Verify the remaining file is doc2.pdf
+    $remainingFiles = $component->get('newAttachments');
+    expect($remainingFiles[0]->getClientOriginalName())->toBe('doc2.pdf');
+});
+
+it('handles removing non-existent pending file gracefully', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file])
+        ->call('removeNewAttachment', 999)
+        ->assertCount('newAttachments', 1);
+});
+
+it('clears all pending files from newAttachments array', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file1 = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+    $file2 = UploadedFile::fake()->create('doc2.pdf', 1024, 'application/pdf');
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file1, $file2])
+        ->assertCount('newAttachments', 2)
+        ->call('clearNewAttachments')
+        ->assertSet('newAttachments', []);
+});
+
+it('clears validation errors when clearing pending files', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file])
+        ->call('addAttachment', 0)
+        ->set('newAttachments', [UploadedFile::fake()->create('large.pdf', 41000, 'application/pdf')])
+        ->assertHasErrors()
+        ->call('clearNewAttachments')
+        ->assertHasNoErrors();
+});
+
+it('adds all pending files at once using addAllAttachments', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file1 = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+    $file2 = UploadedFile::fake()->create('doc2.pdf', 1024, 'application/pdf');
+    $file3 = UploadedFile::fake()->create('doc3.pdf', 1024, 'application/pdf');
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file1, $file2, $file3])
+        ->call('addAllAttachments')
+        ->assertCount('attachments', 3)
+        ->assertSet('newAttachments', [])
+        ->assertDispatched('attachmentsUpdated');
+
+    // Verify all files are stored
+    expect(Storage::disk('local')->allFiles('template-attachments'))->toHaveCount(3);
+});
+
+it('skips files that would exceed limit when using addAllAttachments', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    // Create existing attachment of 38MB
+    $existingSize = 38 * 1024 * 1024;
+
+    // Create two new files: 1MB (should add) and 3MB (should skip - would be 42MB total)
+    $file1 = UploadedFile::fake()->create('small.pdf', 1024, 'application/pdf'); // 1MB
+    $file2 = UploadedFile::fake()->create('large.pdf', 3 * 1024, 'application/pdf'); // 3MB
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('attachments', [
+            [
+                'id' => 'existing-file',
+                'name' => 'existing.pdf',
+                'path' => 'template-attachments/existing.pdf',
+                'disk' => 'local',
+                'size' => $existingSize,
+                'mime_type' => 'application/pdf',
+                'uploaded_at' => now()->toIso8601String(),
+            ],
+        ])
+        ->set('newAttachments', [$file1, $file2])
+        ->call('addAllAttachments')
+        ->assertCount('attachments', 2) // 1 existing + 1 added (1 skipped)
+        ->assertSet('newAttachments', [])
+        ->assertHasErrors('newAttachments');
+});
+
+it('shows warning message for skipped files in addAllAttachments', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $existingSize = 39 * 1024 * 1024; // 39MB
+    $file = UploadedFile::fake()->create('toobig.pdf', 2 * 1024, 'application/pdf'); // 2MB
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('attachments', [
+            [
+                'id' => 'existing-file',
+                'name' => 'existing.pdf',
+                'path' => 'template-attachments/existing.pdf',
+                'disk' => 'local',
+                'size' => $existingSize,
+                'mime_type' => 'application/pdf',
+                'uploaded_at' => now()->toIso8601String(),
+            ],
+        ])
+        ->set('newAttachments', [$file])
+        ->call('addAllAttachments')
+        ->assertHasErrors('newAttachments')
+        ->assertSee('Warning')
+        ->assertSee('skipped')
+        ->assertSee('toobig.pdf');
+});
+
+it('handles empty newAttachments array in addAllAttachments gracefully', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [])
+        ->call('addAllAttachments')
+        ->assertSet('attachments', [])
+        ->assertSet('newAttachments', []);
+});
+
+it('reindexes newAttachments array after removal', function () {
+    Storage::fake('local');
+
+    $this->actingAs(User::factory()->create());
+
+    $file1 = UploadedFile::fake()->create('doc1.pdf', 1024, 'application/pdf');
+    $file2 = UploadedFile::fake()->create('doc2.pdf', 1024, 'application/pdf');
+    $file3 = UploadedFile::fake()->create('doc3.pdf', 1024, 'application/pdf');
+
+    $component = Livewire::test(AttachmentUpload::class)
+        ->set('newAttachments', [$file1, $file2, $file3])
+        ->call('removeNewAttachment', 1) // Remove middle file
+        ->assertCount('newAttachments', 2);
+
+    // Verify array is properly reindexed (0, 1 instead of 0, 2)
+    $newAttachments = $component->get('newAttachments');
+    expect(array_keys($newAttachments))->toBe([0, 1]);
+});

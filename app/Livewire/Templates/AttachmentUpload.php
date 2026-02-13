@@ -109,6 +109,79 @@ class AttachmentUpload extends Component
         $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
     }
 
+    public function removeNewAttachment(int $index): void
+    {
+        if (! isset($this->newAttachments[$index])) {
+            return;
+        }
+
+        unset($this->newAttachments[$index]);
+        $this->newAttachments = array_values($this->newAttachments);
+    }
+
+    public function clearNewAttachments(): void
+    {
+        $this->newAttachments = [];
+        $this->resetErrorBag();
+    }
+
+    public function addAllAttachments(): void
+    {
+        if (empty($this->newAttachments)) {
+            return;
+        }
+
+        $addedCount = 0;
+        $skippedCount = 0;
+        $skippedFiles = [];
+
+        foreach ($this->newAttachments as $index => $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            // Check if adding this file would exceed the 40MB total limit
+            $futureTotal = $this->getTotalSizeProperty() + $file->getSize();
+            if ($futureTotal > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
+                $skippedCount++;
+                $skippedFiles[] = $file->getClientOriginalName();
+
+                continue;
+            }
+
+            // Store file on default disk
+            $disk = config('filesystems.default');
+            $path = Storage::disk($disk)->putFile('template-attachments', $file);
+
+            $this->attachments[] = [
+                'id' => (string) str()->ulid(),
+                'name' => $file->getClientOriginalName(),
+                'path' => $path,
+                'disk' => $disk,
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+                'uploaded_at' => now()->toIso8601String(),
+            ];
+
+            $addedCount++;
+        }
+
+        // Clear the pending uploads
+        $this->newAttachments = [];
+
+        // Show warning if files were skipped
+        if ($skippedCount > 0) {
+            $message = sprintf(
+                'Warning: %d file(s) were skipped as they would exceed the 40MB limit: %s',
+                $skippedCount,
+                implode(', ', $skippedFiles)
+            );
+            $this->addError('newAttachments', $message);
+        }
+
+        $this->dispatch('attachmentsUpdated', attachments: $this->attachments);
+    }
+
     public function getTotalSizeProperty(): int
     {
         return collect($this->attachments)->sum('size');
