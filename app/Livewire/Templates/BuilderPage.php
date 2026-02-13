@@ -65,6 +65,11 @@ class BuilderPage extends Component
     /**
      * @var array<int, array<string, mixed>>
      */
+    public array $attachments = [];
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
     public array $historySnapshots = [];
 
     public int $historyCursor = -1;
@@ -114,6 +119,11 @@ class BuilderPage extends Component
      */
     public array $starterTemplateOptions = [];
 
+    /**
+     * @var array<string, string>
+     */
+    protected $listeners = ['attachmentsUpdated' => 'updateAttachments'];
+
     public function mount(EmailTemplate|int|string|null $template = null): void
     {
         $this->theme = $this->defaultTheme();
@@ -147,6 +157,9 @@ class BuilderPage extends Component
             $this->templateKey = 'blank';
             $this->rows = [];
 
+            // Load existing attachments for raw mode templates
+            $this->attachments = $resolvedTemplate->attachments ?? [];
+
             return;
         }
 
@@ -158,6 +171,9 @@ class BuilderPage extends Component
             $this->templateKey = 'blank';
             $this->rows = [];
 
+            // Load existing attachments for legacy templates
+            $this->attachments = $resolvedTemplate->attachments ?? [];
+
             return;
         }
 
@@ -168,6 +184,11 @@ class BuilderPage extends Component
         $this->rows = $this->normalizeRows((array) ($migratedSchema['rows'] ?? []));
         $this->hydrateSelection();
         $this->captureHistory();
+
+        // Load existing attachments
+        if ($resolvedTemplate !== null) {
+            $this->attachments = $resolvedTemplate->attachments ?? [];
+        }
     }
 
     public function updated(string $property): void
@@ -379,12 +400,25 @@ class BuilderPage extends Component
         data_set($this, $path, $currentValue.$glue.$placeholder);
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $attachments
+     */
+    public function updateAttachments(array $attachments): void
+    {
+        $this->attachments = $attachments;
+    }
+
     public function continueToBuilder(): void
     {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
             'theme.content_width' => ['required', 'integer', 'min:480', 'max:760'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*.id' => ['required', 'string'],
+            'attachments.*.name' => ['required', 'string'],
+            'attachments.*.path' => ['required', 'string'],
+            'attachments.*.size' => ['required', 'integer', 'max:'.EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES],
         ]);
 
         $attributes = [
@@ -393,6 +427,7 @@ class BuilderPage extends Component
             'html_content' => $this->currentHtmlContent(),
             'builder_schema' => $this->mode === 'visual' ? $this->currentSchema() : null,
             'is_active' => false,
+            'attachments' => $this->attachments,
         ];
 
         if ($this->templateId === null) {
@@ -419,6 +454,7 @@ class BuilderPage extends Component
             'subject' => ['required', 'string', 'max:255'],
             'mode' => ['required', 'in:visual,raw'],
             'isActive' => ['required', 'boolean'],
+            'attachments' => ['nullable', 'array'],
         ];
 
         if ($this->mode === 'raw') {
@@ -436,12 +472,21 @@ class BuilderPage extends Component
             $this->validateVisualCanvas();
         }
 
+        // Validate total attachment size
+        $totalSize = collect($this->attachments)->sum('size');
+        if ($totalSize > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES) {
+            throw ValidationException::withMessages([
+                'attachments' => __('Total attachment size exceeds 40MB limit.'),
+            ]);
+        }
+
         $attributes = [
             'name' => $validated['name'],
             'subject' => $validated['subject'],
             'html_content' => $this->currentHtmlContent(),
             'builder_schema' => $this->mode === 'visual' ? $this->currentSchema() : null,
             'is_active' => $validated['isActive'],
+            'attachments' => $this->attachments,
         ];
 
         if ($this->templateId === null) {
@@ -865,6 +910,13 @@ class BuilderPage extends Component
         }
 
         return null;
+    }
+
+    public function getIsOverAttachmentLimitProperty(): bool
+    {
+        $totalSize = collect($this->attachments)->sum('size');
+
+        return $totalSize > EmailTemplate::MAX_TOTAL_ATTACHMENT_SIZE_BYTES;
     }
 
     public function render(): View
