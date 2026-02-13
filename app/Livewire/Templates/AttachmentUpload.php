@@ -101,8 +101,10 @@ class AttachmentUpload extends Component
                 'mimes:'.implode(',', EmailTemplate::ALLOWED_ATTACHMENT_EXTENSIONS),
             ],
         ], [
-            'newAttachments.*.mimetypes' => 'The file must be a PDF, Word document, Excel spreadsheet, or PowerPoint presentation.',
-            'newAttachments.*.mimes' => 'Invalid file extension. Allowed: pdf, docx, doc, xlsx, xls, pptx, ppt',
+            'newAttachments.*.file' => 'One or more files failed to upload. Please try again.',
+            'newAttachments.*.max' => 'One or more files exceed the 40MB maximum file size.',
+            'newAttachments.*.mimetypes' => 'One or more files are not a valid type. Only PDF, Word, Excel, and PowerPoint files are allowed.',
+            'newAttachments.*.mimes' => 'One or more files have an invalid extension. Allowed: pdf, doc, docx, xls, xlsx, ppt, pptx',
         ]);
     }
 

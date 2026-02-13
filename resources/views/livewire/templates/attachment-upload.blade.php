@@ -49,7 +49,12 @@
         />
         
         @error('newAttachments.*')
-            <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            <div class="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                <div class="flex items-start text-red-700 dark:text-red-400">
+                    <flux:icon.exclamation-circle class="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <span class="text-sm">{{ $message }}</span>
+                </div>
+            </div>
         @enderror
 
         {{-- Pending uploads --}}
@@ -64,17 +69,17 @@
                             wire:click="addAllAttachments" 
                             size="sm" 
                             variant="primary"
+                            icon="check"
                             :disabled="$this->isOverLimit"
                         >
-                            <flux:icon.check class="w-4 h-4 mr-1" />
                             Add All
                         </flux:button>
                         <flux:button 
                             wire:click="clearNewAttachments" 
                             size="sm" 
                             variant="ghost"
+                            icon="x-mark"
                         >
-                            <flux:icon.x-mark class="w-4 h-4 mr-1" />
                             Clear All
                         </flux:button>
                     </div>
@@ -101,10 +106,9 @@
                                 wire:click="removeNewAttachment({{ $index }})" 
                                 size="sm" 
                                 variant="ghost"
+                                icon="trash"
                                 class="text-red-600 hover:text-red-700 flex-shrink-0"
-                            >
-                                <flux:icon.trash class="w-4 h-4" />
-                            </flux:button>
+                            />
                         </div>
                     @endforeach
                 </div>
@@ -136,10 +140,9 @@
                         wire:click="removeAttachment('{{ $attachment['id'] }}')" 
                         size="sm" 
                         variant="ghost"
+                        icon="trash"
                         class="text-red-600 hover:text-red-700"
-                    >
-                        <flux:icon.trash class="w-4 h-4" />
-                    </flux:button>
+                    />
                 </div>
             @endforeach
         </div>
