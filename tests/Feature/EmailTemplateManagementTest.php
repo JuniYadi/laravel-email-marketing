@@ -38,6 +38,16 @@ it('renders template create page for authenticated users', function () {
         ->assertSee('wire:click.stop="selectElement(', false);
 });
 
+it('downloads templates as csv', function () {
+    $this->actingAs(User::factory()->create());
+
+    EmailTemplate::factory()->create();
+
+    Livewire::test('pages::templates.index')
+        ->call('exportCsv')
+        ->assertFileDownloaded();
+});
+
 it('creates visual template without button element and stores schema v2', function () {
     $this->actingAs(User::factory()->create());
 
