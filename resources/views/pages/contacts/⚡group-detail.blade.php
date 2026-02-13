@@ -6,6 +6,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
@@ -187,6 +188,61 @@ new class extends Component
     {
         return ContactGroup::query()->orderBy('name')->get();
     }
+
+    /**
+     * Export the group's contacts to CSV.
+     */
+    public function exportCsv(): StreamedResponse
+    {
+        $filename = sprintf(
+            'contact-group-%d-%s.csv',
+            $this->group->id,
+            now()->format('Ymd_His'),
+        );
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'group_id',
+                'group_name',
+                'contact_id',
+                'email',
+                'first_name',
+                'last_name',
+                'company',
+                'is_invalid',
+                'created_at',
+            ], ',', '"', '');
+
+            $this->group->contacts()
+                ->when($this->search !== '', fn ($query) => $query->where('email', 'like', '%'.$this->search.'%'))
+                ->orderBy('id')
+                ->chunkById(500, function (Collection $contacts) use ($handle): void {
+                    foreach ($contacts as $contact) {
+                        fputcsv($handle, [
+                            $this->group->id,
+                            $this->group->name,
+                            $contact->id,
+                            $contact->email,
+                            $contact->first_name,
+                            $contact->last_name,
+                            $contact->company,
+                            $contact->is_invalid ? '1' : '0',
+                            $contact->created_at?->format('Y-m-d H:i:s'),
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
 }
 ?>
 
@@ -195,9 +251,14 @@ new class extends Component
         <!-- Header with back button -->
         <div class="flex items-center justify-between">
             <flux:heading size="xl">{{ $group->name }}</flux:heading>
-            <flux:button :href="route('contacts.index')" variant="ghost" icon="arrow-left" wire:navigate>
-                {{ __('Back to Contacts') }}
-            </flux:button>
+            <div class="flex items-center gap-2">
+                <flux:button wire:click="exportCsv" variant="outline" icon="arrow-down-tray">
+                    {{ __('Export CSV') }}
+                </flux:button>
+                <flux:button :href="route('contacts.index')" variant="ghost" icon="arrow-left" wire:navigate>
+                    {{ __('Back to Contacts') }}
+                </flux:button>
+            </div>
         </div>
 
         <!-- Group Details Card -->

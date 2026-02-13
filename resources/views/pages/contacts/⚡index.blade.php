@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
@@ -352,6 +353,98 @@ new class extends Component
             ->all();
     }
 
+    /**
+     * Export all contacts with assigned groups to CSV.
+     */
+    public function exportContactsCsv(): StreamedResponse
+    {
+        $filename = sprintf('contacts-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'id',
+                'email',
+                'first_name',
+                'last_name',
+                'company',
+                'is_invalid',
+                'group_ids',
+                'group_names',
+                'created_at',
+            ], ',', '"', '');
+
+            Contact::query()
+                ->with('groups:id,name')
+                ->orderBy('id')
+                ->chunkById(500, function (Collection $contacts) use ($handle): void {
+                    foreach ($contacts as $contact) {
+                        fputcsv($handle, [
+                            $contact->id,
+                            $contact->email,
+                            $contact->first_name,
+                            $contact->last_name,
+                            $contact->company,
+                            $contact->is_invalid ? '1' : '0',
+                            $contact->groups->pluck('id')->implode('|'),
+                            $contact->groups->pluck('name')->implode('|'),
+                            $contact->created_at?->format('Y-m-d H:i:s'),
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Export all groups with contact counts to CSV.
+     */
+    public function exportGroupsCsv(): StreamedResponse
+    {
+        $filename = sprintf('contact-groups-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'id',
+                'name',
+                'contacts_count',
+                'created_at',
+            ], ',', '"', '');
+
+            ContactGroup::query()
+                ->withCount('contacts')
+                ->orderBy('id')
+                ->chunkById(500, function (Collection $groups) use ($handle): void {
+                    foreach ($groups as $group) {
+                        fputcsv($handle, [
+                            $group->id,
+                            $group->name,
+                            $group->contacts_count,
+                            $group->created_at?->format('Y-m-d H:i:s'),
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     #[Computed]
     public function groups(): Collection
     {
@@ -385,6 +478,12 @@ new class extends Component
 
             @if ($activeTab === 'contacts')
                 <div class="flex flex-wrap items-center gap-3">
+                    <flux:button wire:click="exportContactsCsv" variant="outline" icon="arrow-down-tray">
+                        {{ __('Export Contacts') }}
+                    </flux:button>
+                    <flux:button wire:click="exportGroupsCsv" variant="outline" icon="arrow-down-tray">
+                        {{ __('Export Groups') }}
+                    </flux:button>
                     <flux:button wire:click="openCreateGroupModal" variant="primary">
                         {{ __('Create Group') }}
                     </flux:button>

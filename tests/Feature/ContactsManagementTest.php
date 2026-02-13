@@ -85,3 +85,33 @@ it('uses fullName when first and last names are missing in csv', function () {
         ->and($contact->last_name)->toBe('Carter')
         ->and($contact->full_name)->toBe('Sam Carter');
 });
+
+it('downloads contacts and groups csv from contacts page', function () {
+    $this->actingAs(User::factory()->create());
+
+    Contact::factory()->create();
+    ContactGroup::factory()->create();
+
+    Livewire::test('pages::contacts.index')
+        ->call('exportContactsCsv')
+        ->assertFileDownloaded();
+
+    Livewire::test('pages::contacts.index')
+        ->call('exportGroupsCsv')
+        ->assertFileDownloaded();
+});
+
+it('downloads filtered group contacts as csv', function () {
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $matchingContact = Contact::factory()->create(['email' => 'match@example.com']);
+    $otherContact = Contact::factory()->create(['email' => 'other@example.com']);
+
+    $group->contacts()->attach([$matchingContact->id, $otherContact->id]);
+
+    Livewire::test('pages::contacts.group-detail', ['group' => $group])
+        ->set('search', 'match@example.com')
+        ->call('exportCsv')
+        ->assertFileDownloaded();
+});

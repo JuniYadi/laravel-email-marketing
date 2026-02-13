@@ -252,7 +252,7 @@ new class extends Component
                 'failed_at',
                 'skipped_at',
                 'last_error',
-            ]);
+            ], ',', '"', '');
 
             $this->filteredRecipientsQuery()
                 ->with([
@@ -282,7 +282,7 @@ new class extends Component
                             $recipient->failed_at?->format('Y-m-d H:i:s'),
                             $recipient->skipped_at?->format('Y-m-d H:i:s'),
                             $recipient->last_error,
-                        ]);
+                        ], ',', '"', '');
                     }
                 });
 

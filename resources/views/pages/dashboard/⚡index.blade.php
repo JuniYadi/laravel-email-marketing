@@ -4,6 +4,7 @@ use App\Models\BroadcastRecipient;
 use App\Models\BroadcastRecipientEvent;
 use App\Models\Contact;
 use Illuminate\Support\Carbon;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -193,14 +194,67 @@ new class extends Component
             BroadcastRecipient::STATUS_CLICKED,
         ];
     }
+
+    /**
+     * Export dashboard summary and trend metrics to CSV.
+     */
+    public function exportCsv(): StreamedResponse
+    {
+        $filename = sprintf('dashboard-metrics-%s.csv', now()->format('Ymd_His'));
+        $chartPayload = $this->chartPayload;
+        $datasets = collect($chartPayload['datasets'] ?? [])->keyBy('key');
+        $dates = $chartPayload['dates'] ?? [];
+
+        return response()->streamDownload(function () use ($datasets, $dates): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'date',
+                'send',
+                'delivered',
+                'bounce',
+                'reject',
+                'complaint',
+                'open',
+                'click',
+            ], ',', '"', '');
+
+            foreach ($dates as $index => $date) {
+                fputcsv($handle, [
+                    $date,
+                    (int) ($datasets->get('send')['data'][$index] ?? 0),
+                    (int) ($datasets->get('delivered')['data'][$index] ?? 0),
+                    (int) ($datasets->get('bounce')['data'][$index] ?? 0),
+                    (int) ($datasets->get('reject')['data'][$index] ?? 0),
+                    (int) ($datasets->get('complaint')['data'][$index] ?? 0),
+                    (int) ($datasets->get('open')['data'][$index] ?? 0),
+                    (int) ($datasets->get('click')['data'][$index] ?? 0),
+                ], ',', '"', '');
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
 };
 ?>
 
 <section class="w-full">
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 lg:p-8">
-        <div class="flex flex-col gap-2">
-            <flux:heading size="xl">{{ __('Dashboard Overview') }}</flux:heading>
-            <flux:text>{{ __('Track all-time deliverability metrics and daily email performance trends.') }}</flux:text>
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <flux:heading size="xl">{{ __('Dashboard Overview') }}</flux:heading>
+                <flux:text>{{ __('Track all-time deliverability metrics and daily email performance trends.') }}</flux:text>
+            </div>
+
+            <flux:button wire:click="exportCsv" variant="outline" icon="arrow-down-tray">
+                {{ __('Export CSV') }}
+            </flux:button>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
