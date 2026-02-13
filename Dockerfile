@@ -56,7 +56,7 @@ ENV PHP_EXT_pgsql=1
 ENV PHP_EXT_pdo_pgsql=1
 
 # Install supervisord and netcat for health checks
-RUN apk add --no-cache supervisor netcat-openbsd
+RUN apt-get update && apt-get install -y supervisor netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 # Create supervisor log directory
 RUN mkdir -p /var/log/supervisor
