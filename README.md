@@ -46,6 +46,7 @@ A powerful, self-hosted email marketing solution built with Laravel 12. Manage c
 ### AWS Integration
 - AWS SES for reliable email delivery
 - AWS SNS webhooks for real-time event tracking
+- AWS S3 for scalable file storage (email template images)
 - Email tagging for campaign correlation
 
 ---
@@ -63,11 +64,13 @@ flowchart TB
     end
 
     subgraph AWS["AWS Cloud"]
+        S3["AWS S3<br/>(File Storage)"]
         SES["AWS SES<br/>(Email Sending)"]
         SNS["AWS SNS Topic<br/>(Event Notifications)"]
     end
 
     Contacts --> Broadcasts
+    Templates -->|"Upload images"| S3
     Templates --> Broadcasts
     Broadcasts --> Queue
     Queue -->|"Send with tags<br/>(broadcast_id, contact_id)"| SES
@@ -86,9 +89,10 @@ flowchart TB
 ```
 
 ### Data Flow
-1. **Sending**: Broadcast → Queue → AWS SES (with correlation tags)
-2. **Tracking**: AWS SES/SNS → Webhook (`/webhooks/sns`) → Database
-3. **Events**: Delivery, Bounce, Complaint, Open, Click
+1. **Storage**: Email template images → AWS S3
+2. **Sending**: Broadcast → Queue → AWS SES (with correlation tags)
+3. **Tracking**: AWS SES/SNS → Webhook (`/webhooks/sns`) → Database
+4. **Events**: Delivery, Bounce, Complaint, Open, Click
 
 ---
 
@@ -483,6 +487,193 @@ MAIL_FROM_NAME="${APP_NAME}"
 
 ---
 
+## AWS S3 Storage Setup
+
+This application can store email template images on AWS S3 for scalable, reliable cloud storage.
+
+### Prerequisites
+
+- AWS account with S3 access
+- S3 bucket created (or use the steps below)
+- IAM credentials with S3 permissions (for Docker) OR IAM role with IRSA (for Kubernetes)
+
+### Step 1: Create S3 Bucket
+
+```bash
+# Create bucket
+aws s3 mb s3://your-marketing-mail-bucket --region us-east-1
+
+# Enable versioning (optional but recommended)
+aws s3api put-bucket-versioning \
+  --bucket your-marketing-mail-bucket \
+  --versioning-configuration Status=Enabled
+
+# Set public access block (keep private, use signed URLs)
+aws s3api put-public-access-block \
+  --bucket your-marketing-mail-bucket \
+  --public-access-block-configuration \
+  "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+```
+
+### Step 2: Configure IAM Permissions
+
+#### For Docker/EC2 (IAM User Credentials)
+
+```bash
+# Create IAM policy
+cat > s3-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-marketing-mail-bucket",
+        "arn:aws:s3:::your-marketing-mail-bucket/*"
+      ]
+    }
+  ]
+}
+EOF
+
+aws iam put-user-policy \
+  --user-name marketing-mail-ses \
+  --policy-name S3StorageAccess \
+  --policy-document file://s3-policy.json
+```
+
+#### For Kubernetes/EKS (IAM Role with IRSA)
+
+See the [Kubernetes Deployment Guide](kubernetes/README.md) for complete IRSA setup instructions.
+
+### Step 3: Configure Application
+
+Update your `.env` file:
+
+```env
+# Use S3 for file storage
+FILESYSTEM_DISK=s3
+
+# S3 Configuration
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=your-marketing-mail-bucket
+
+# Optional: Custom S3 endpoint (for S3-compatible services)
+# AWS_ENDPOINT=https://s3.amazonaws.com
+# AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+### Step 4: Test S3 Integration
+
+```bash
+# Test file upload
+php artisan tinker
+>>> Storage::disk('s3')->put('test.txt', 'Hello from S3!');
+>>> Storage::disk('s3')->get('test.txt');
+>>> Storage::disk('s3')->url('test.txt');
+```
+
+### Storage Options
+
+You can switch between different storage drivers by changing `FILESYSTEM_DISK`:
+
+| Disk | Use Case | Configuration |
+|------|----------|---------------|
+| `local` | Development, files stored in `storage/app/private` | Default, no extra config |
+| `public` | Development, files stored in `storage/app/public` | Requires `php artisan storage:link` |
+| `s3` | Production, files stored in AWS S3 | Requires AWS credentials |
+
+### S3-Compatible Storage
+
+This application works with any S3-compatible storage service:
+
+**DigitalOcean Spaces:**
+```env
+FILESYSTEM_DISK=s3
+AWS_ENDPOINT=https://nyc3.digitaloceanspaces.com
+AWS_BUCKET=your-space-name
+AWS_DEFAULT_REGION=us-east-1
+```
+
+**MinIO:**
+```env
+FILESYSTEM_DISK=s3
+AWS_ENDPOINT=http://minio:9000
+AWS_USE_PATH_STYLE_ENDPOINT=true
+AWS_BUCKET=marketing-mail
+```
+
+**Cloudflare R2:**
+```env
+FILESYSTEM_DISK=s3
+AWS_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+AWS_BUCKET=marketing-mail
+AWS_DEFAULT_REGION=auto
+```
+
+---
+
+## Kubernetes / AWS EKS Deployment
+
+This application supports production deployment on AWS EKS with IAM Roles for Service Accounts (IRSA) for secure, credential-free AWS access.
+
+### Features
+
+- **No Hardcoded Credentials**: Uses IRSA for automatic AWS authentication
+- **Auto-Scaling**: Horizontal Pod Autoscaler support
+- **High Availability**: Multi-replica deployment with rolling updates
+- **Managed Infrastructure**: Fully managed Kubernetes on AWS EKS
+- **Load Balancing**: AWS Application Load Balancer integration
+
+### Quick Start
+
+```bash
+# 1. Create EKS cluster with OIDC provider
+eksctl create cluster \
+  --name marketing-mail-cluster \
+  --region us-east-1 \
+  --with-oidc \
+  --managed
+
+# 2. Create IAM role for IRSA (see detailed guide)
+# 3. Update Kubernetes manifests with your configuration
+# 4. Deploy to cluster
+
+kubectl apply -f kubernetes/
+```
+
+### Full Documentation
+
+For complete step-by-step instructions including:
+- EKS cluster setup
+- IAM role creation with IRSA
+- S3 bucket configuration
+- Load balancer setup
+- DNS configuration
+- Monitoring and troubleshooting
+
+**See: [Kubernetes Deployment Guide](kubernetes/README.md)**
+
+### Architecture
+
+The Kubernetes deployment includes:
+- **Application Pods** (2 replicas) - Web interface and API
+- **Queue Workers** (1+ replicas) - Background email processing
+- **Scheduler Pod** (1 replica) - Cron jobs and scheduled tasks
+- **AWS Load Balancer** - HTTPS ingress with ACM certificates
+- **IRSA** - Automatic AWS credentials via ServiceAccount
+
+---
+
 ## Manual Installation
 
 ### Requirements
@@ -527,24 +718,31 @@ php artisan queue:work
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `APP_URL` | Application URL (used for webhooks) | Yes |
-| `DB_HOST` | Database host | Yes |
-| `DB_DATABASE` | Database name | Yes |
-| `DB_USERNAME` | Database username | Yes |
-| `DB_PASSWORD` | Database password | Yes |
-| `AWS_ACCESS_KEY_ID` | AWS access key | Yes |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | Yes |
-| `AWS_DEFAULT_REGION` | AWS region (e.g., us-east-1) | Yes |
-| `MAIL_FROM_ADDRESS` | Sender email address | Yes |
-| `MAIL_FROM_NAME` | Sender name | No |
-| `QUEUE_CONNECTION` | Queue driver (database/redis) | No |
-| `BROADCAST_ALLOWED_DOMAINS` | Allowed sender domains | No |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No (OAuth) |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | No (OAuth) |
-| `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No (OAuth) |
-| `AUTH_MODE` | Authentication mode (both/google_only/manual_only) | No |
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `APP_URL` | Application URL (used for webhooks) | Yes | - |
+| `DB_HOST` | Database host | Yes | - |
+| `DB_DATABASE` | Database name | Yes | - |
+| `DB_USERNAME` | Database username | Yes | - |
+| `DB_PASSWORD` | Database password | Yes | - |
+| `AWS_ACCESS_KEY_ID` | AWS access key (not needed with IRSA) | Yes* | - |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key (not needed with IRSA) | Yes* | - |
+| `AWS_DEFAULT_REGION` | AWS region (e.g., us-east-1) | Yes | us-east-1 |
+| `AWS_BUCKET` | S3 bucket name for file storage | No | - |
+| `FILESYSTEM_DISK` | Storage disk (local/public/s3) | No | local |
+| `MAIL_MAILER` | Mail driver (ses/smtp/log) | Yes | log |
+| `MAIL_FROM_ADDRESS` | Sender email address | Yes | - |
+| `MAIL_FROM_NAME` | Sender name | No | APP_NAME |
+| `SES_CONFIGURATION_SET` | SES configuration set name | No | - |
+| `ALLOWED_DOMAIN` | Allowed sender domains (comma-separated) | No | - |
+| `QUEUE_CONNECTION` | Queue driver (database/redis/sqs) | No | database |
+| `CACHE_STORE` | Cache driver (database/redis) | No | database |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No | - |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | No | - |
+| `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No | /auth/google/callback |
+| `AUTH_MODE` | Authentication mode (both/google_only/manual_only) | No | both |
+
+*Not required when using Kubernetes with IRSA (IAM Roles for Service Accounts)
 
 ---
 
@@ -558,7 +756,9 @@ php artisan queue:work
 | JavaScript | Alpine.js |
 | Testing | Pest 4 |
 | Email | AWS SES |
+| Storage | AWS S3 (or local) |
 | Tracking | AWS SNS Webhooks |
+| Orchestration | Kubernetes (optional) |
 
 ---
 
