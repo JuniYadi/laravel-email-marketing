@@ -551,7 +551,7 @@ aws iam put-user-policy \
 
 #### For Kubernetes/EKS (IAM Role with IRSA)
 
-See the [Kubernetes Deployment Guide](kubernetes/README.md) for complete IRSA setup instructions.
+See the [Kubernetes Deployment Guide](docs/kubernetes/README.md) for complete IRSA setup instructions.
 
 ### Step 3: Configure Application
 
@@ -648,7 +648,7 @@ eksctl create cluster \
 # 3. Update Kubernetes manifests with your configuration
 # 4. Deploy to cluster
 
-kubectl apply -f kubernetes/
+kubectl apply -f docs/kubernetes/
 ```
 
 ### Full Documentation
@@ -661,7 +661,7 @@ For complete step-by-step instructions including:
 - DNS configuration
 - Monitoring and troubleshooting
 
-**See: [Kubernetes Deployment Guide](kubernetes/README.md)**
+**See: [Kubernetes Deployment Guide](docs/kubernetes/README.md)**
 
 ### Architecture
 
