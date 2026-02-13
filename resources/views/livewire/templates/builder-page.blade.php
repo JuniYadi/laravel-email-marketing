@@ -21,6 +21,13 @@
                 @if ($currentStep === 2)
                     <flux:button type="button" variant="ghost" wire:click="undo">{{ __('Undo') }}</flux:button>
                     <flux:button type="button" variant="ghost" wire:click="redo">{{ __('Redo') }}</flux:button>
+                    <flux:button type="button" variant="ghost" wire:click="backToSetup">
+                        {{ __('Back to Setup') }}
+                    </flux:button>
+                @else
+                    <flux:button type="button" variant="ghost" wire:click="continueToBuilder">
+                        {{ __('Go to Canvas') }}
+                    </flux:button>
                 @endif
 
                 <flux:button :href="route('templates.index')" variant="ghost" icon="arrow-left">
@@ -30,16 +37,36 @@
         </div>
 
         <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
-            <x-wizard.step-indicator :current-step="$currentStep" />
-            <flux:text class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                {{ $currentStep === 1 ? __('Set up template details before entering the canvas.') : __('Build your template layout and content.') }}
-            </flux:text>
+            <div class="flex flex-col items-center justify-center text-center">
+                <x-wizard.step-indicator :current-step="$currentStep" />
+                <flux:text class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    {{ $currentStep === 1 ? __('Set up template details before entering the canvas.') : __('Build your template layout and content.') }}
+                </flux:text>
+            </div>
         </div>
 
         <form wire:submit="saveTemplate">
             @if ($currentStep === 1)
-                <div class="mx-auto w-full max-w-3xl rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
-                    @include('livewire.templates.builder-page-step1')
+                <div class="grid gap-6 xl:grid-cols-[1fr_320px]">
+                    <div class="space-y-5 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+                        @include('livewire.templates.builder-page-step1')
+                    </div>
+
+                    <aside class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                        <flux:heading size="sm">{{ __('Next: Canvas Builder') }}</flux:heading>
+                        <flux:text class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            {{ __('After setup, you can arrange rows, drag elements, and edit content directly in the canvas.') }}
+                        </flux:text>
+
+                        <div class="mt-4 space-y-2">
+                            <flux:text class="text-xs text-zinc-500">{{ __('Step 2 includes:') }}</flux:text>
+                            <ul class="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
+                                <li>{{ __('• Layout presets') }}</li>
+                                <li>{{ __('• Elements palette') }}</li>
+                                <li>{{ __('• Visual/Raw mode') }}</li>
+                            </ul>
+                        </div>
+                    </aside>
                 </div>
             @else
                 <div class="grid gap-6 xl:grid-cols-[1fr_320px]">
