@@ -31,6 +31,12 @@
         </div>
     </div>
 
+    {{-- Attachments Section --}}
+    <div class="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700">
+        <flux:heading size="sm" class="mb-4">{{ __('Attachments') }}</flux:heading>
+        <livewire:templates.attachment-upload :template-id="$templateId" />
+    </div>
+
     <div class="flex items-center justify-between gap-3 pt-4">
         <flux:button :href="route('templates.index')" variant="ghost" type="button">
             {{ __('Cancel') }}

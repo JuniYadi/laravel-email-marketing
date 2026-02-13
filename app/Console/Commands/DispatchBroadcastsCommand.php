@@ -35,7 +35,7 @@ class DispatchBroadcastsCommand extends Command
 
         Broadcast::query()
             ->where('status', Broadcast::STATUS_RUNNING)
-            ->with('group:id', 'template:id,subject,html_content,builder_schema,version')
+            ->with('group:id', 'template:id,subject,html_content,builder_schema,version,attachments')
             ->orderBy('id')
             ->each(function (Broadcast $broadcast): void {
                 $this->ensureSnapshotAndSender($broadcast);
@@ -85,7 +85,17 @@ class DispatchBroadcastsCommand extends Command
         ) {
             $broadcast->snapshot_subject = $template?->subject ?? '';
             $broadcast->snapshot_html_content = $template?->html_content ?? '';
-            $broadcast->snapshot_builder_schema = $template?->builder_schema;
+
+            // Build snapshot with attachments
+            $builderSchema = $template?->builder_schema;
+            if (is_array($builderSchema)) {
+                $builderSchema['attachments'] = $template?->attachments ?? [];
+            } elseif ($builderSchema === null) {
+                // For non-visual templates, create minimal schema with attachments
+                $builderSchema = ['attachments' => $template?->attachments ?? []];
+            }
+
+            $broadcast->snapshot_builder_schema = $builderSchema;
             $broadcast->snapshot_template_version = $template?->version ?? 1;
         }
 

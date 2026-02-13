@@ -119,3 +119,147 @@ it('recovers stale queued recipients and dispatches them again', function () {
 
     Queue::assertPushed(SendBroadcastRecipientMail::class, 1);
 });
+
+it('includes template attachments in broadcast snapshot when promoting scheduled broadcasts', function () {
+    Queue::fake();
+
+    $group = ContactGroup::factory()->create();
+
+    $attachments = [
+        [
+            'filename' => 'document.pdf',
+            'path' => 'attachments/abc123.pdf',
+            'size' => 1024,
+            'mime_type' => 'application/pdf',
+        ],
+        [
+            'filename' => 'spreadsheet.xlsx',
+            'path' => 'attachments/def456.xlsx',
+            'size' => 2048,
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ],
+    ];
+
+    $template = EmailTemplate::factory()->create([
+        'subject' => 'Test Subject',
+        'html_content' => '<p>Test Content</p>',
+        'builder_schema' => ['schema_version' => 2, 'rows' => []],
+        'attachments' => $attachments,
+        'version' => 1,
+    ]);
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => 'scheduled',
+        'starts_at' => now()->subMinute(),
+        'messages_per_minute' => 1,
+        'from_prefix' => 'test',
+        'from_domain' => 'example.com',
+        'snapshot_subject' => null,
+        'snapshot_html_content' => null,
+        'snapshot_builder_schema' => null,
+        'snapshot_template_version' => null,
+    ]);
+
+    $contact = Contact::factory()->create(['is_invalid' => false]);
+    $group->contacts()->attach([$contact->id]);
+
+    $this->artisan('broadcasts:dispatch')->assertSuccessful();
+
+    $broadcast->refresh();
+
+    expect($broadcast->snapshot_builder_schema)->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toHaveCount(2)
+        ->and($broadcast->snapshot_builder_schema['attachments'][0]['filename'])->toBe('document.pdf')
+        ->and($broadcast->snapshot_builder_schema['attachments'][1]['filename'])->toBe('spreadsheet.xlsx');
+});
+
+it('includes empty attachments array in snapshot when template has no attachments', function () {
+    Queue::fake();
+
+    $group = ContactGroup::factory()->create();
+
+    $template = EmailTemplate::factory()->create([
+        'subject' => 'Test Subject',
+        'html_content' => '<p>Test Content</p>',
+        'builder_schema' => ['schema_version' => 2, 'rows' => []],
+        'attachments' => null, // No attachments
+        'version' => 1,
+    ]);
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => 'scheduled',
+        'starts_at' => now()->subMinute(),
+        'messages_per_minute' => 1,
+        'from_prefix' => 'test',
+        'from_domain' => 'example.com',
+        'snapshot_subject' => null,
+        'snapshot_html_content' => null,
+        'snapshot_builder_schema' => null,
+        'snapshot_template_version' => null,
+    ]);
+
+    $contact = Contact::factory()->create(['is_invalid' => false]);
+    $group->contacts()->attach([$contact->id]);
+
+    $this->artisan('broadcasts:dispatch')->assertSuccessful();
+
+    $broadcast->refresh();
+
+    expect($broadcast->snapshot_builder_schema)->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toBeEmpty();
+});
+
+it('creates minimal schema with attachments for non-visual templates', function () {
+    Queue::fake();
+
+    $group = ContactGroup::factory()->create();
+
+    $attachments = [
+        [
+            'filename' => 'report.pdf',
+            'path' => 'attachments/xyz789.pdf',
+            'size' => 5120,
+            'mime_type' => 'application/pdf',
+        ],
+    ];
+
+    $template = EmailTemplate::factory()->create([
+        'subject' => 'Test Subject',
+        'html_content' => '<p>Test Content</p>',
+        'builder_schema' => null, // Non-visual template
+        'attachments' => $attachments,
+        'version' => 1,
+    ]);
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => 'scheduled',
+        'starts_at' => now()->subMinute(),
+        'messages_per_minute' => 1,
+        'from_prefix' => 'test',
+        'from_domain' => 'example.com',
+        'snapshot_subject' => null,
+        'snapshot_html_content' => null,
+        'snapshot_builder_schema' => null,
+        'snapshot_template_version' => null,
+    ]);
+
+    $contact = Contact::factory()->create(['is_invalid' => false]);
+    $group->contacts()->attach([$contact->id]);
+
+    $this->artisan('broadcasts:dispatch')->assertSuccessful();
+
+    $broadcast->refresh();
+
+    expect($broadcast->snapshot_builder_schema)->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toBeArray()
+        ->and($broadcast->snapshot_builder_schema['attachments'])->toHaveCount(1)
+        ->and($broadcast->snapshot_builder_schema['attachments'][0]['filename'])->toBe('report.pdf');
+});

@@ -28,7 +28,7 @@ class SendBroadcastRecipientMail implements ShouldQueue
     public function handle(TemplateRenderer $renderer): void
     {
         $recipient = BroadcastRecipient::query()
-            ->with(['broadcast', 'contact'])
+            ->with(['broadcast.template', 'contact'])
             ->find($this->recipientId);
 
         if ($recipient === null) {
@@ -79,6 +79,9 @@ class SendBroadcastRecipientMail implements ShouldQueue
             now()->addDays(30)
         );
 
+        // Get attachments from broadcast snapshot or fall back to email template
+        $attachments = $broadcast->snapshot_builder_schema['attachments'] ?? $broadcast->template?->attachments ?? [];
+
         try {
             $sentMessage = Mail::to($recipient->email)->send(new BroadcastRecipientMail(
                 subjectLine: $subject,
@@ -92,6 +95,7 @@ class SendBroadcastRecipientMail implements ShouldQueue
                     'contact_id' => (string) $recipient->contact_id,
                 ],
                 unsubscribeUrl: $unsubscribeUrl,
+                attachments: $attachments,
             ));
 
             $providerMessageId = null;
