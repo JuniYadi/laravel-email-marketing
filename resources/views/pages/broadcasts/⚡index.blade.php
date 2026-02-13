@@ -239,6 +239,86 @@ new class extends Component
     }
 
     /**
+     * Open edit modal for a broadcast.
+     */
+    public function openEditBroadcastModal(int $broadcastId): void
+    {
+        $broadcast = Broadcast::query()->findOrFail($broadcastId);
+
+        if (! in_array($broadcast->status, [Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED], true)) {
+            return;
+        }
+
+        $this->editingBroadcastId = $broadcast->id;
+        $this->editBroadcastName = $broadcast->name;
+        $this->editBroadcastGroupId = (string) $broadcast->contact_group_id;
+        $this->editBroadcastTemplateId = (string) $broadcast->email_template_id;
+        $this->editBroadcastReplyTo = $broadcast->reply_to ?? '';
+        $this->editBroadcastFromName = $broadcast->from_name ?? '';
+        $this->editBroadcastFromPrefix = $broadcast->from_prefix ?? '';
+        $this->editBroadcastFromDomain = $broadcast->from_domain ?? $this->allowedDomains[0] ?? '';
+        $this->editBroadcastMessagesPerMinute = $broadcast->messages_per_minute ?? 1;
+        $this->editBroadcastStartsAt = $broadcast->starts_at?->format('Y-m-d\TH:i') ?? '';
+        $this->showEditBroadcastModal = true;
+    }
+
+    /**
+     * Update an existing broadcast.
+     */
+    public function updateBroadcast(): void
+    {
+        $validated = $this->validate([
+            'editBroadcastName' => ['required', 'string', 'max:255'],
+            'editBroadcastGroupId' => ['required', 'integer', 'exists:contact_groups,id'],
+            'editBroadcastTemplateId' => ['required', 'integer', 'exists:email_templates,id'],
+            'editBroadcastReplyTo' => ['required', 'email'],
+            'editBroadcastFromName' => ['required', 'string', 'max:255'],
+            'editBroadcastFromPrefix' => ['required', 'string', 'max:64'],
+            'editBroadcastFromDomain' => ['required', 'string', Rule::in($this->allowedDomains)],
+            'editBroadcastMessagesPerMinute' => ['required', 'integer', 'min:1'],
+            'editBroadcastStartsAt' => ['required', 'date'],
+        ]);
+
+        $normalizedPrefix = Str::of($validated['editBroadcastFromPrefix'])
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', '-')
+            ->trim('-')
+            ->value();
+
+        if ($normalizedPrefix === '') {
+            $this->addError('editBroadcastFromPrefix', __('Only letters and numbers are allowed in sender prefix.'));
+
+            return;
+        }
+
+        $broadcast = Broadcast::query()->findOrFail($this->editingBroadcastId);
+
+        if (! in_array($broadcast->status, [Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED], true)) {
+            $this->showEditBroadcastModal = false;
+
+            return;
+        }
+
+        $broadcast->update([
+            'name' => $validated['editBroadcastName'],
+            'contact_group_id' => (int) $validated['editBroadcastGroupId'],
+            'email_template_id' => (int) $validated['editBroadcastTemplateId'],
+            'starts_at' => Carbon::parse($validated['editBroadcastStartsAt']),
+            'messages_per_minute' => (int) $validated['editBroadcastMessagesPerMinute'],
+            'reply_to' => $validated['editBroadcastReplyTo'],
+            'from_name' => $validated['editBroadcastFromName'],
+            'from_prefix' => $normalizedPrefix,
+            'from_domain' => $validated['editBroadcastFromDomain'],
+        ]);
+
+        $this->reset('editingBroadcastId', 'editBroadcastName', 'editBroadcastGroupId', 'editBroadcastTemplateId', 'editBroadcastReplyTo', 'editBroadcastFromName', 'editBroadcastFromPrefix', 'editBroadcastStartsAt');
+        $this->editBroadcastFromDomain = $this->allowedDomains[0] ?? '';
+        $this->editBroadcastMessagesPerMinute = 1;
+        $this->showEditBroadcastModal = false;
+        $this->dispatch('broadcast-updated');
+    }
+
+    /**
      * Requeue failed or stale queued recipients for a broadcast.
      */
     public function requeueBroadcast(int $broadcastId): void
