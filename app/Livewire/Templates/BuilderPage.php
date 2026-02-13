@@ -21,13 +21,19 @@ class BuilderPage extends Component
 
     public ?int $templateId = null;
 
+    public ?EmailTemplate $template = null;
+
     public bool $isEditing = false;
 
     public bool $isLegacyTemplate = false;
 
     public int $schemaVersion = 2;
 
+    public int $currentStep = 1;
+
     public string $workspaceTab = 'builder';
+
+    public string $sidebarTab = 'layout';
 
     public string $mode = 'visual';
 
@@ -115,21 +121,25 @@ class BuilderPage extends Component
             ->map(fn (array $item): string => $item['label'])
             ->all();
 
+        $step = (int) request('step', 1);
         $resolvedTemplate = $this->resolveTemplate($template);
 
         if ($resolvedTemplate === null) {
             $this->applyStarterTemplate($this->templateKey);
             $this->captureHistory();
+            $this->currentStep = max(1, min(2, $step));
 
             return;
         }
 
         $this->isEditing = true;
         $this->templateId = $resolvedTemplate->id;
+        $this->template = $resolvedTemplate;
         $this->name = $resolvedTemplate->name;
         $this->subject = $resolvedTemplate->subject;
         $this->htmlContent = $resolvedTemplate->html_content;
         $this->isActive = $resolvedTemplate->is_active;
+        $this->currentStep = max(2, min(2, $step));
 
         if (! is_array($resolvedTemplate->builder_schema)) {
             $this->mode = 'raw';
@@ -190,6 +200,13 @@ class BuilderPage extends Component
         if ($this->mode === 'visual') {
             $this->applyStarterTemplate($templateKey);
             $this->captureHistory();
+        }
+    }
+
+    public function updatedSidebarTab(string $sidebarTab): void
+    {
+        if (! in_array($sidebarTab, ['layout', 'elements'], true)) {
+            $this->sidebarTab = 'layout';
         }
     }
 
@@ -356,6 +373,39 @@ class BuilderPage extends Component
         $glue = trim($currentValue) === '' ? '' : ' ';
 
         data_set($this, $path, $currentValue.$glue.$placeholder);
+    }
+
+    public function continueToBuilder(): void
+    {
+        $validated = $this->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'subject' => ['required', 'string', 'max:255'],
+            'theme.content_width' => ['required', 'integer', 'min:480', 'max:760'],
+        ]);
+
+        $attributes = [
+            'name' => $validated['name'],
+            'subject' => $validated['subject'],
+            'html_content' => $this->currentHtmlContent(),
+            'builder_schema' => $this->mode === 'visual' ? $this->currentSchema() : null,
+            'is_active' => false,
+        ];
+
+        if ($this->templateId === null) {
+            $this->template = EmailTemplate::query()->create(array_merge($attributes, ['version' => 1]));
+            $this->templateId = $this->template->id;
+            $this->isEditing = true;
+        } else {
+            $this->template = EmailTemplate::query()->findOrFail($this->templateId);
+            $this->template->update($attributes);
+        }
+
+        $this->currentStep = 2;
+    }
+
+    public function backToSetup(): void
+    {
+        $this->currentStep = 1;
     }
 
     public function saveTemplate(): void
@@ -682,17 +732,17 @@ class BuilderPage extends Component
                                 ->map(function (array $element): array {
                                     $type = (string) ($element['type'] ?? 'text');
 
-                                return [
-                                    'id' => (string) ($element['id'] ?? (string) str()->ulid()),
-                                    'type' => $type,
-                                    'content' => $this->sanitizeElementContent(
-                                        $type,
-                                        array_replace($this->defaultElementContent($type), (array) ($element['content'] ?? [])),
-                                    ),
-                                    'style' => is_array($element['style'] ?? null) ? $element['style'] : [],
-                                    'visibility' => array_replace(['desktop' => true, 'mobile' => true], (array) ($element['visibility'] ?? [])),
-                                ];
-                            })
+                                    return [
+                                        'id' => (string) ($element['id'] ?? (string) str()->ulid()),
+                                        'type' => $type,
+                                        'content' => $this->sanitizeElementContent(
+                                            $type,
+                                            array_replace($this->defaultElementContent($type), (array) ($element['content'] ?? [])),
+                                        ),
+                                        'style' => is_array($element['style'] ?? null) ? $element['style'] : [],
+                                        'visibility' => array_replace(['desktop' => true, 'mobile' => true], (array) ($element['visibility'] ?? [])),
+                                    ];
+                                })
                                 ->values()
                                 ->all(),
                         ];
