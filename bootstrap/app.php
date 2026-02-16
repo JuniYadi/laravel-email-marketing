@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/sns',
         ]);
 
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'auth.mode' => CheckAuthMode::class,
         ]);
