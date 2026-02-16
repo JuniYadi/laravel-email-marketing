@@ -37,4 +37,9 @@ Route::livewire('unsubscribe/{contact}', 'pages::unsubscribe.show')
     ->name('unsubscribe')
     ->middleware('signed');
 
+// Legal Pages
+Route::view('terms-of-service', 'legal.terms-of-service')->name('legal.tos');
+Route::view('acceptable-use-policy', 'legal.acceptable-use-policy')->name('legal.aup');
+Route::view('privacy-policy', 'legal.privacy-policy')->name('legal.privacy');
+
 require __DIR__.'/settings.php';
