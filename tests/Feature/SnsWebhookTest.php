@@ -6,6 +6,7 @@ use App\Models\Contact;
 use App\Models\ContactGroup;
 use App\Models\EmailTemplate;
 use App\Models\SnsWebhookMessage;
+use Illuminate\Support\Facades\Http;
 
 it('stores detailed notification payload from sns webhooks', function () {
     $payload = [
@@ -82,6 +83,39 @@ it('stores subscription confirmation metadata for later processing', function ()
         'token' => 'subscription-token',
         'subscribe_url' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
     ]);
+});
+
+it('automatically confirms sns subscription confirmation messages', function () {
+    Http::fake([
+        'https://sns.us-east-1.amazonaws.com/*' => Http::response('confirmed', 200),
+    ]);
+
+    $payload = [
+        'Type' => 'SubscriptionConfirmation',
+        'MessageId' => 'sns-message-2-auto',
+        'Token' => 'subscription-token',
+        'TopicArn' => 'arn:aws:sns:us-east-1:123456789012:marketing-events',
+        'Message' => 'You have chosen to subscribe to the topic.',
+        'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&TopicArn=arn:aws:sns:us-east-1:123456789012:marketing-events&Token=subscription-token',
+        'Timestamp' => '2026-02-12T09:46:00.000Z',
+        'SignatureVersion' => '1',
+        'Signature' => 'sample-signature',
+        'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
+    ];
+
+    $response = $this->postJson('/webhooks/sns', $payload);
+
+    $response
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'SubscriptionConfirmation',
+        ]);
+
+    Http::assertSent(function ($request): bool {
+        return $request->method() === 'GET'
+            && str_starts_with($request->url(), 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription');
+    });
 });
 
 it('maps sns delivery events into broadcast recipient tracking', function () {
