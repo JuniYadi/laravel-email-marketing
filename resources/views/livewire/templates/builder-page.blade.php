@@ -1,6 +1,6 @@
 <section class="w-full">
     <div
-        class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 lg:p-8"
+        class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-8"
         x-data="{ dragItem: null }"
         @if($currentStep === 2)
             x-on:keydown.window.ctrl.z.prevent="$wire.undo()"
