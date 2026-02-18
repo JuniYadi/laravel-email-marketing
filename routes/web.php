@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Templates\TemplateAttachmentController;
 use App\Http\Controllers\Webhooks\SnsWebhookController;
 use App\Livewire\Templates\BuilderPage;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('templates', 'pages::templates.index')->name('templates.index');
     Route::livewire('templates/create', BuilderPage::class)->name('templates.create');
     Route::livewire('templates/{template}/edit', BuilderPage::class)->name('templates.edit');
+
+    Route::prefix('templates/attachments')->name('templates.attachments.')->group(function () {
+        Route::post('presign', [TemplateAttachmentController::class, 'presign'])->name('presign');
+        Route::post('finalize', [TemplateAttachmentController::class, 'finalize'])->name('finalize');
+        Route::delete('', [TemplateAttachmentController::class, 'delete'])->name('delete');
+        Route::post('cleanup-unsaved', [TemplateAttachmentController::class, 'cleanupUnsaved'])->name('cleanup-unsaved');
+    });
 });
 
 Route::livewire('unsubscribe/{contact}', 'pages::unsubscribe.show')
