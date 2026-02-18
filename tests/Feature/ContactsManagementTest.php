@@ -115,3 +115,16 @@ it('downloads filtered group contacts as csv', function () {
         ->call('exportCsv')
         ->assertFileDownloaded();
 });
+
+it('shows simplified contact page actions with a more dropdown', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('contacts.index'))
+        ->assertSuccessful()
+        ->assertSee('Add Contact')
+        ->assertSee('Import CSV')
+        ->assertSee('More')
+        ->assertSee('Create Group')
+        ->assertSee('Export Contacts')
+        ->assertSee('Export Groups');
+});

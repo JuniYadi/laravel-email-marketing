@@ -478,21 +478,29 @@ new class extends Component
 
             @if ($activeTab === 'contacts')
                 <div class="flex flex-wrap items-center gap-3">
-                    <flux:button wire:click="exportContactsCsv" variant="outline" icon="arrow-down-tray">
-                        {{ __('Export Contacts') }}
-                    </flux:button>
-                    <flux:button wire:click="exportGroupsCsv" variant="outline" icon="arrow-down-tray">
-                        {{ __('Export Groups') }}
-                    </flux:button>
-                    <flux:button wire:click="openCreateGroupModal" variant="primary">
-                        {{ __('Create Group') }}
-                    </flux:button>
-                    <flux:button wire:click="openImportModal" variant="filled">
-                        {{ __('Import CSV') }}
-                    </flux:button>
-                    <flux:button wire:click="openCreateContactModal" variant="outline">
+                    <flux:button wire:click="openCreateContactModal" variant="primary">
                         {{ __('Add Contact') }}
                     </flux:button>
+                    <flux:button wire:click="openImportModal" variant="outline" icon="arrow-up-tray">
+                        {{ __('Import CSV') }}
+                    </flux:button>
+                    <flux:dropdown position="bottom" align="end">
+                        <flux:button variant="ghost" icon:trailing="chevron-down">
+                            {{ __('More') }}
+                        </flux:button>
+                        <flux:menu>
+                            <flux:menu.item wire:click="openCreateGroupModal" icon="user-group">
+                                {{ __('Create Group') }}
+                            </flux:menu.item>
+                            <flux:menu.separator />
+                            <flux:menu.item wire:click="exportContactsCsv" icon="arrow-down-tray">
+                                {{ __('Export Contacts') }}
+                            </flux:menu.item>
+                            <flux:menu.item wire:click="exportGroupsCsv" icon="arrow-down-tray">
+                                {{ __('Export Groups') }}
+                            </flux:menu.item>
+                        </flux:menu>
+                    </flux:dropdown>
                 </div>
             @endif
         </div>

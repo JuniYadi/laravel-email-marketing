@@ -245,7 +245,7 @@ new class extends Component
 ?>
 
 <section class="w-full">
-    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 lg:p-8">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-8">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <flux:heading size="xl">{{ __('Dashboard Overview') }}</flux:heading>
