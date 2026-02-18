@@ -315,7 +315,10 @@
                             <flux:button 
                                 variant="primary" 
                                 type="submit"
-                                x-bind:disabled="$wire.$get('isOverAttachmentLimit')"
+                                :loading="false"
+                                wire:loading.attr="disabled"
+                                wire:target="saveTemplate"
+                                @disabled($this->isOverAttachmentLimit)
                             >
                                 {{ $isEditing ? __('Update Template') : __('Save Template') }}
                             </flux:button>
