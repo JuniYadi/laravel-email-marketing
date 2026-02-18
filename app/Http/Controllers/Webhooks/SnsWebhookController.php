@@ -9,8 +9,11 @@ use App\Models\BroadcastRecipient;
 use App\Models\BroadcastRecipientEvent;
 use App\Models\Contact;
 use App\Models\SnsWebhookMessage;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SnsWebhookController extends Controller
@@ -44,6 +47,8 @@ class SnsWebhookController extends Controller
             'headers' => $request->headers->all(),
             'raw_body' => $request->getContent(),
         ]);
+
+        $this->confirmSubscriptionIfNeeded($validated);
 
         $this->trackBroadcastRecipientEvent(
             messageType: (string) $validated['Type'],
@@ -244,6 +249,67 @@ class SnsWebhookController extends Controller
             'click' => BroadcastRecipientEvent::TYPE_CLICK,
             default => null,
         };
+    }
+
+    /**
+     * Confirm SNS HTTP/HTTPS subscriptions automatically for valid AWS URLs.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function confirmSubscriptionIfNeeded(array $payload): void
+    {
+        if (($payload['Type'] ?? null) !== 'SubscriptionConfirmation') {
+            return;
+        }
+
+        $subscribeUrl = $payload['SubscribeURL'] ?? null;
+
+        if (! is_string($subscribeUrl) || ! $this->isTrustedSnsSubscribeUrl($subscribeUrl)) {
+            return;
+        }
+
+        try {
+            Http::connectTimeout(5)
+                ->timeout(10)
+                ->retry(2, 200, throw: false)
+                ->get($subscribeUrl);
+        } catch (ConnectionException $exception) {
+            Log::warning('Failed to confirm SNS subscription due to connection error.', [
+                'message_id' => $payload['MessageId'] ?? null,
+                'topic_arn' => $payload['TopicArn'] ?? null,
+                'subscribe_url' => $subscribeUrl,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function isTrustedSnsSubscribeUrl(string $subscribeUrl): bool
+    {
+        $parts = parse_url($subscribeUrl);
+
+        if (! is_array($parts)) {
+            return false;
+        }
+
+        $scheme = isset($parts['scheme']) ? Str::lower((string) $parts['scheme']) : null;
+        $host = isset($parts['host']) ? Str::lower((string) $parts['host']) : null;
+        $query = isset($parts['query']) ? (string) $parts['query'] : '';
+
+        if ($scheme !== 'https' || $host === null) {
+            return false;
+        }
+
+        if (! Str::startsWith($host, 'sns.')) {
+            return false;
+        }
+
+        if (! Str::endsWith($host, ['.amazonaws.com', '.amazonaws.com.cn'])) {
+            return false;
+        }
+
+        parse_str($query, $queryParams);
+
+        return ($queryParams['Action'] ?? null) === 'ConfirmSubscription';
     }
 
     protected function handleUnsubscribe(array $message): void
