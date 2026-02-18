@@ -3,6 +3,7 @@
 use App\Livewire\Templates\BuilderPage;
 use App\Models\EmailTemplate;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -366,4 +367,67 @@ test('getIsOverAttachmentLimitProperty returns false for empty attachments', fun
         ->set('attachments', []);
 
     expect($component->get('isOverAttachmentLimit'))->toBeFalse();
+});
+
+test('cancelEditing removes unsaved attachments for new template flow', function (): void {
+    Storage::disk('local')->put('template-attachments/new-unsaved.pdf', 'content');
+
+    Livewire::test(BuilderPage::class)
+        ->set('attachments', [
+            [
+                'id' => 'att-new',
+                'name' => 'new-unsaved.pdf',
+                'path' => 'template-attachments/new-unsaved.pdf',
+                'disk' => 'local',
+                'size' => 7,
+                'mime_type' => 'application/pdf',
+            ],
+        ])
+        ->call('cancelEditing')
+        ->assertRedirect(route('templates.index'));
+
+    Storage::disk('local')->assertMissing('template-attachments/new-unsaved.pdf');
+});
+
+test('cancelEditing keeps existing attachment but removes newly uploaded attachment for edit flow', function (): void {
+    Storage::disk('local')->put('template-attachments/existing.pdf', 'existing');
+    Storage::disk('local')->put('template-attachments/new-upload.pdf', 'new');
+
+    $template = EmailTemplate::factory()->create([
+        'attachments' => [
+            [
+                'id' => 'att-existing',
+                'name' => 'existing.pdf',
+                'path' => 'template-attachments/existing.pdf',
+                'disk' => 'local',
+                'size' => 8,
+                'mime_type' => 'application/pdf',
+            ],
+        ],
+    ]);
+
+    Livewire::test(BuilderPage::class, ['template' => $template])
+        ->set('attachments', [
+            [
+                'id' => 'att-existing',
+                'name' => 'existing.pdf',
+                'path' => 'template-attachments/existing.pdf',
+                'disk' => 'local',
+                'size' => 8,
+                'mime_type' => 'application/pdf',
+            ],
+            [
+                'id' => 'att-new',
+                'name' => 'new-upload.pdf',
+                'path' => 'template-attachments/new-upload.pdf',
+                'disk' => 'local',
+                'size' => 3,
+                'mime_type' => 'application/pdf',
+            ],
+        ])
+        ->call('cancelEditing')
+        ->assertRedirect(route('templates.index'));
+
+    Storage::disk('local')->assertExists('template-attachments/existing.pdf');
+    Storage::disk('local')->assertMissing('template-attachments/new-upload.pdf');
 });

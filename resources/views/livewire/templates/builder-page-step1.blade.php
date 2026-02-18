@@ -55,7 +55,7 @@
     </div>
 
     <div class="flex items-center justify-between gap-3 pt-4">
-        <flux:button :href="route('templates.index')" variant="ghost" type="button">
+        <flux:button type="button" wire:click="cancelEditing" variant="ghost">
             {{ __('Cancel') }}
         </flux:button>
 

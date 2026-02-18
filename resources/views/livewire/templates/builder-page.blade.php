@@ -30,7 +30,7 @@
                     </flux:button>
                 @endif
 
-                <flux:button :href="route('templates.index')" variant="ghost" icon="arrow-left">
+                <flux:button type="button" wire:click="cancelEditing" variant="ghost" icon="arrow-left">
                     {{ __('Back to Templates') }}
                 </flux:button>
             </div>
@@ -309,7 +309,7 @@
                         @endif
 
                         <div class="mt-6 flex items-center justify-end gap-2">
-                            <flux:button :href="route('templates.index')" variant="ghost" type="button">
+                            <flux:button type="button" wire:click="cancelEditing" variant="ghost">
                                 {{ __('Cancel') }}
                             </flux:button>
                             <flux:button 
