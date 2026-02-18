@@ -147,6 +147,36 @@ it('shows simplified step 2 controls with always-visible mode', function () {
         ->assertDontSee('Content Width');
 });
 
+it('scopes step 2 save button loading to saveTemplate action', function () {
+    $this->actingAs(User::factory()->create());
+
+    $template = EmailTemplate::factory()->create([
+        'builder_schema' => [
+            'schema_version' => 2,
+            'meta' => ['template_name' => 'x', 'template_key' => 'welcome'],
+            'theme' => [],
+            'rows' => [
+                [
+                    'columns' => [
+                        [
+                            'width' => '100%',
+                            'elements' => [
+                                ['type' => 'text', 'content' => ['text' => 'Welcome']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    Livewire::test(BuilderPage::class, ['template' => $template])
+        ->assertSet('currentStep', 2)
+        ->assertSee('wire:target="saveTemplate"', false)
+        ->assertSee('wire:loading.attr="disabled"', false)
+        ->assertDontSee('x-bind:disabled="$wire.$get(\'isOverAttachmentLimit\')"', false);
+});
+
 it('normalizes invalid sidebar tab values back to layout', function () {
     $this->actingAs(User::factory()->create());
 
