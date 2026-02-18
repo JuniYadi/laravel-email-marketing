@@ -70,6 +70,11 @@ class BuilderPage extends Component
     public array $attachments = [];
 
     /**
+     * @var array<int, string>
+     */
+    public array $originalAttachmentStorageKeys = [];
+
+    /**
      * @var array<int, array<string, mixed>>
      */
     public array $historySnapshots = [];
@@ -161,6 +166,7 @@ class BuilderPage extends Component
 
             // Load existing attachments for raw mode templates
             $this->attachments = $resolvedTemplate->attachments ?? [];
+            $this->captureOriginalAttachmentStorageKeys();
 
             return;
         }
@@ -175,6 +181,7 @@ class BuilderPage extends Component
 
             // Load existing attachments for legacy templates
             $this->attachments = $resolvedTemplate->attachments ?? [];
+            $this->captureOriginalAttachmentStorageKeys();
 
             return;
         }
@@ -190,6 +197,7 @@ class BuilderPage extends Component
         // Load existing attachments
         if ($resolvedTemplate !== null) {
             $this->attachments = $resolvedTemplate->attachments ?? [];
+            $this->captureOriginalAttachmentStorageKeys();
         }
     }
 
@@ -454,6 +462,7 @@ class BuilderPage extends Component
             $this->template->update($attributes);
         }
 
+        $this->captureOriginalAttachmentStorageKeys();
         $this->currentStep = 2;
     }
 
@@ -516,6 +525,13 @@ class BuilderPage extends Component
 
             session()->flash('status', __('Template updated successfully.'));
         }
+
+        $this->redirect(route('templates.index'), navigate: true);
+    }
+
+    public function cancelEditing(): void
+    {
+        $this->cleanupUnsavedAttachments();
 
         $this->redirect(route('templates.index'), navigate: true);
     }
@@ -925,6 +941,59 @@ class BuilderPage extends Component
         }
 
         return null;
+    }
+
+    protected function cleanupUnsavedAttachments(): void
+    {
+        $unsavedAttachments = collect($this->attachments)
+            ->filter(function (array $attachment): bool {
+                $storageKey = $this->attachmentStorageKey($attachment);
+
+                if ($storageKey === null) {
+                    return false;
+                }
+
+                return ! in_array($storageKey, $this->originalAttachmentStorageKeys, true);
+            });
+
+        foreach ($unsavedAttachments as $attachment) {
+            $path = (string) ($attachment['path'] ?? '');
+            $disk = (string) ($attachment['disk'] ?? config('filesystems.default'));
+
+            if ($path === '' || $disk === '') {
+                continue;
+            }
+
+            if (! str_starts_with($path, 'template-attachments/') || str_contains($path, '..')) {
+                continue;
+            }
+
+            Storage::disk($disk)->delete($path);
+        }
+    }
+
+    protected function captureOriginalAttachmentStorageKeys(): void
+    {
+        $this->originalAttachmentStorageKeys = collect($this->attachments)
+            ->map(fn (array $attachment): ?string => $this->attachmentStorageKey($attachment))
+            ->filter(fn (?string $storageKey): bool => $storageKey !== null)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $attachment
+     */
+    protected function attachmentStorageKey(array $attachment): ?string
+    {
+        $path = isset($attachment['path']) ? (string) $attachment['path'] : '';
+        $disk = isset($attachment['disk']) ? (string) $attachment['disk'] : (string) config('filesystems.default');
+
+        if ($path === '' || $disk === '') {
+            return null;
+        }
+
+        return $disk.':'.$path;
     }
 
     public function getIsOverAttachmentLimitProperty(): bool
