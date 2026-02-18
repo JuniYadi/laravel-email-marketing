@@ -312,13 +312,13 @@
                             <flux:button type="button" wire:click="cancelEditing" variant="ghost">
                                 {{ __('Cancel') }}
                             </flux:button>
-                            <flux:button 
-                                variant="primary" 
+                            <flux:button
+                                variant="primary"
                                 type="submit"
                                 :loading="false"
                                 wire:loading.attr="disabled"
                                 wire:target="saveTemplate"
-                                @disabled($this->isOverAttachmentLimit)
+                                :disabled="$this->isOverAttachmentLimit"
                             >
                                 {{ $isEditing ? __('Update Template') : __('Save Template') }}
                             </flux:button>
