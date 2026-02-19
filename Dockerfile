@@ -55,6 +55,9 @@ ENV PHP_EXT_bcmath=1
 ENV PHP_EXT_pgsql=1
 ENV PHP_EXT_pdo_pgsql=1
 
+# Trust Cloudflare proxy - enables real IP forwarding in nginx
+ENV NGINX_TRUST_CLOUDFLARE=1
+
 # Install supervisord, cron, and netcat for health checks
 RUN apt-get update && apt-get install -y supervisor cron netcat-openbsd && rm -rf /var/lib/apt/lists/*
 

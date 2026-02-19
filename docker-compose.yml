@@ -40,6 +40,8 @@ services:
       - PHP_EXT_pdo_pgsql=1
       # Optional: Run migrations on startup
       - RUN_MIGRATIONS=true
+      # Trust Cloudflare proxy - enables real IP forwarding in nginx
+      - NGINX_TRUST_CLOUDFLARE=1
     volumes:
       - ./storage:/var/www/html/storage
     depends_on:
