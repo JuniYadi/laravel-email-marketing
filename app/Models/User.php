@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'email_verified_at',
+        'is_admin',
         'google_id',
         'google_token',
         'google_refresh_token',
@@ -54,6 +55,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
             'google_token' => 'encrypted',
             'google_refresh_token' => 'encrypted',
         ];
@@ -105,5 +107,13 @@ class User extends Authenticatable
         }
 
         return 'none';
+    }
+
+    /**
+     * Determine if this user has administrator access.
+     */
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
     }
 }

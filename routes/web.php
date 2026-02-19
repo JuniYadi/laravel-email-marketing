@@ -22,6 +22,9 @@ Route::livewire('dashboard', 'pages::dashboard.index')
     ->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::livewire('users', 'pages::users.index')
+        ->middleware('can:manage-users')
+        ->name('users.index');
     Route::livewire('contacts', 'pages::contacts.index')->name('contacts.index');
     Route::livewire('contacts/groups/{group}', 'pages::contacts.group-detail')->name('contacts.groups.show');
     Route::livewire('broadcasts', 'pages::broadcasts.index')->name('broadcasts.index');
