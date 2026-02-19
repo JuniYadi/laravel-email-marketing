@@ -24,6 +24,9 @@
                     <flux:sidebar.item icon="clock" :href="route('broadcasts.history')" :current="request()->routeIs('broadcasts.history')" wire:navigate>
                         {{ __('Broadcast History') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="inbox-stack" :href="route('webhooks.logs')" :current="request()->routeIs('webhooks.logs')" wire:navigate>
+                        {{ __('Webhook Logs') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}
                     </flux:sidebar.item>

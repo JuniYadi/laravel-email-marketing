@@ -26,6 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('contacts/groups/{group}', 'pages::contacts.group-detail')->name('contacts.groups.show');
     Route::livewire('broadcasts', 'pages::broadcasts.index')->name('broadcasts.index');
     Route::livewire('broadcasts/history', 'pages::broadcasts.history')->name('broadcasts.history');
+    Route::livewire('webhooks/logs', 'pages::webhooks.logs')->name('webhooks.logs');
     Route::livewire('templates', 'pages::templates.index')->name('templates.index');
     Route::livewire('templates/create', BuilderPage::class)->name('templates.create');
     Route::livewire('templates/{template}/edit', BuilderPage::class)->name('templates.edit');

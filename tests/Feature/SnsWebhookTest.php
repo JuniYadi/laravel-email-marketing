@@ -85,6 +85,41 @@ it('stores subscription confirmation metadata for later processing', function ()
     ]);
 });
 
+it('stores long sns subscription tokens without truncation errors', function () {
+    Http::fake([
+        'https://sns.us-east-1.amazonaws.com/*' => Http::response('confirmed', 200),
+    ]);
+
+    $longToken = str_repeat('a', 512);
+    $payload = [
+        'Type' => 'SubscriptionConfirmation',
+        'MessageId' => 'sns-message-long-token',
+        'Token' => $longToken,
+        'TopicArn' => 'arn:aws:sns:us-east-1:123456789012:marketing-events',
+        'Message' => 'You have chosen to subscribe to the topic.',
+        'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription',
+        'Timestamp' => '2026-02-12T09:46:00.000Z',
+        'SignatureVersion' => '1',
+        'Signature' => 'sample-signature',
+        'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
+    ];
+
+    $response = $this->postJson('/api/webhooks/sns', $payload);
+
+    $response
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'SubscriptionConfirmation',
+            'message_id' => 'sns-message-long-token',
+        ]);
+
+    $this->assertDatabaseHas('sns_webhook_messages', [
+        'message_id' => 'sns-message-long-token',
+        'token' => $longToken,
+    ]);
+});
+
 it('automatically confirms sns subscription confirmation messages', function () {
     Http::fake([
         'https://sns.us-east-1.amazonaws.com/*' => Http::response('confirmed', 200),
