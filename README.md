@@ -60,7 +60,7 @@ flowchart TB
         Templates["Template Builder"]
         Broadcasts["Broadcasts"]
         Queue["Queue Worker"]
-        Webhook["SNS Webhook<br/>/webhooks/sns"]
+        Webhook["SNS Webhook<br/>/api/webhooks/sns"]
     end
 
     subgraph AWS["AWS Cloud"]
@@ -91,7 +91,7 @@ flowchart TB
 ### Data Flow
 1. **Storage**: Email template images → AWS S3
 2. **Sending**: Broadcast → Queue → AWS SES (with correlation tags)
-3. **Tracking**: AWS SES/SNS → Webhook (`/webhooks/sns`) → Database
+3. **Tracking**: AWS SES/SNS → Webhook (`/api/webhooks/sns`) → Database
 4. **Events**: Delivery, Bounce, Complaint, Open, Click
 
 ---
@@ -395,7 +395,7 @@ aws sns create-topic \
 
 ```bash
 # Set your webhook URL (replace with your domain)
-WEBHOOK_URL="https://your-domain.com/webhooks/sns"
+WEBHOOK_URL="https://your-domain.com/api/webhooks/sns"
 TOPIC_ARN="arn:aws:sns:us-east-1:123456789:ses-notifications"
 
 # Configure SES to send notifications to SNS
@@ -464,7 +464,7 @@ aws ses send-email \
 
 ```bash
 # Verify webhook is accessible
-curl -X POST https://your-domain.com/webhooks/sns \
+curl -X POST https://your-domain.com/api/webhooks/sns \
   -H "Content-Type: application/json" \
   -d '{"Type": "Notification", "Message": "{}"}'
 ```

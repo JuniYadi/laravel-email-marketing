@@ -30,7 +30,7 @@ it('marks contact as unsubscribed on complaint', function () {
         ]),
     ];
 
-    $this->postJson('/webhooks/sns', $payload)
+    $this->postJson('/api/webhooks/sns', $payload)
         ->assertOk();
 
     $contact->refresh();

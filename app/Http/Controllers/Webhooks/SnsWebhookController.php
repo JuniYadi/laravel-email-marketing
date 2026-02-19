@@ -25,6 +25,16 @@ class SnsWebhookController extends Controller
     {
         $validated = $request->validated();
 
+        // Log incoming SNS request for debugging
+        Log::info('SNS webhook received', [
+            'type' => $validated['Type'] ?? 'unknown',
+            'message_id' => $validated['MessageId'] ?? null,
+            'topic_arn' => $validated['TopicArn'] ?? null,
+            'subscribe_url' => $validated['SubscribeURL'] ?? null,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
         $payload = $request->json()->all();
         if ($payload === []) {
             $payload = $validated;
