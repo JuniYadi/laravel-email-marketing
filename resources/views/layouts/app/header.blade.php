@@ -13,6 +13,11 @@
                 <flux:navbar.item icon="layout-grid" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                     {{ __('Dashboard') }}
                 </flux:navbar.item>
+                @can('manage-users')
+                    <flux:navbar.item icon="identification" :href="route('users.index')" :current="request()->routeIs('users.index')" wire:navigate>
+                        {{ __('Users') }}
+                    </flux:navbar.item>
+                @endcan
                 <flux:navbar.item icon="users" :href="route('contacts.index')" :current="request()->routeIs('contacts.index')" wire:navigate>
                     {{ __('Contacts') }}
                 </flux:navbar.item>
@@ -68,6 +73,11 @@
                     <flux:sidebar.item icon="layout-grid" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard')  }}
                     </flux:sidebar.item>
+                    @can('manage-users')
+                        <flux:sidebar.item icon="identification" :href="route('users.index')" :current="request()->routeIs('users.index')" wire:navigate>
+                            {{ __('Users') }}
+                        </flux:sidebar.item>
+                    @endcan
                     <flux:sidebar.item icon="users" :href="route('contacts.index')" :current="request()->routeIs('contacts.index')" wire:navigate>
                         {{ __('Contacts') }}
                     </flux:sidebar.item>
