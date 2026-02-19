@@ -118,6 +118,60 @@ it('automatically confirms sns subscription confirmation messages', function () 
     });
 });
 
+it('accepts sns subscription confirmation payloads sent as text plain json', function () {
+    Http::fake([
+        'https://sns.us-east-1.amazonaws.com/*' => Http::response('confirmed', 200),
+    ]);
+
+    $payload = [
+        'Type' => 'SubscriptionConfirmation',
+        'MessageId' => 'sns-message-raw-1',
+        'Token' => 'subscription-token',
+        'TopicArn' => 'arn:aws:sns:us-east-1:123456789012:marketing-events',
+        'Message' => 'You have chosen to subscribe to the topic.',
+        'SubscribeURL' => 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&TopicArn=arn:aws:sns:us-east-1:123456789012:marketing-events&Token=subscription-token',
+        'Timestamp' => '2026-02-12T09:46:00.000Z',
+        'SignatureVersion' => '1',
+        'Signature' => 'sample-signature',
+        'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
+    ];
+
+    $response = $this
+        ->withHeaders([
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'x-amz-sns-message-type' => 'SubscriptionConfirmation',
+            'x-amz-sns-message-id' => $payload['MessageId'],
+            'x-amz-sns-topic-arn' => $payload['TopicArn'],
+        ])
+        ->call(
+            'POST',
+            '/api/webhooks/sns',
+            [],
+            [],
+            [],
+            [],
+            json_encode($payload, JSON_THROW_ON_ERROR),
+        );
+
+    $response
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'SubscriptionConfirmation',
+            'message_id' => 'sns-message-raw-1',
+        ]);
+
+    $this->assertDatabaseHas('sns_webhook_messages', [
+        'message_type' => 'SubscriptionConfirmation',
+        'message_id' => 'sns-message-raw-1',
+    ]);
+
+    Http::assertSent(function ($request): bool {
+        return $request->method() === 'GET'
+            && str_starts_with($request->url(), 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription');
+    });
+});
+
 it('maps sns delivery events into broadcast recipient tracking', function () {
     $group = ContactGroup::factory()->create();
     $template = EmailTemplate::factory()->create();

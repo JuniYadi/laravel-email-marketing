@@ -7,6 +7,30 @@ use Illuminate\Foundation\Http\FormRequest;
 class StoreSnsWebhookRequest extends FormRequest
 {
     /**
+     * Prepare SNS raw payloads for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('Type') !== null) {
+            return;
+        }
+
+        $rawBody = $this->getContent();
+
+        if (! is_string($rawBody) || trim($rawBody) === '') {
+            return;
+        }
+
+        $decodedPayload = json_decode($rawBody, true);
+
+        if (! is_array($decodedPayload)) {
+            return;
+        }
+
+        $this->merge($decodedPayload);
+    }
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
