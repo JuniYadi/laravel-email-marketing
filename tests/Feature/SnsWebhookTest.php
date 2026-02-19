@@ -28,7 +28,7 @@ it('stores detailed notification payload from sns webhooks', function () {
             'x-amz-sns-topic-arn' => $payload['TopicArn'],
             'x-amz-sns-message-id' => $payload['MessageId'],
         ])
-        ->postJson('/webhooks/sns', $payload);
+        ->postJson('/api/webhooks/sns', $payload);
 
     $response
         ->assertSuccessful()
@@ -67,7 +67,7 @@ it('stores subscription confirmation metadata for later processing', function ()
         'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
     ];
 
-    $response = $this->postJson('/webhooks/sns', $payload);
+    $response = $this->postJson('/api/webhooks/sns', $payload);
 
     $response
         ->assertSuccessful()
@@ -103,7 +103,7 @@ it('automatically confirms sns subscription confirmation messages', function () 
         'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
     ];
 
-    $response = $this->postJson('/webhooks/sns', $payload);
+    $response = $this->postJson('/api/webhooks/sns', $payload);
 
     $response
         ->assertSuccessful()
@@ -159,7 +159,7 @@ it('maps sns delivery events into broadcast recipient tracking', function () {
         'SigningCertURL' => 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem',
     ];
 
-    $response = $this->postJson('/webhooks/sns', $payload);
+    $response = $this->postJson('/api/webhooks/sns', $payload);
 
     $response
         ->assertSuccessful()
