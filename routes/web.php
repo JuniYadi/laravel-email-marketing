@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Templates\TemplateAttachmentController;
-use App\Http\Controllers\Webhooks\SnsWebhookController;
 use App\Livewire\Templates\BuilderPage;
 use Illuminate\Support\Facades\Route;
 
@@ -21,8 +20,6 @@ Route::middleware(['guest', 'auth.mode'])->group(function () {
 Route::livewire('dashboard', 'pages::dashboard.index')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
-
-Route::post('webhooks/sns', SnsWebhookController::class)->name('webhooks.sns');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('contacts', 'pages::contacts.index')->name('contacts.index');
