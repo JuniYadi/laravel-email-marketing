@@ -33,7 +33,9 @@ it('creates a broadcast from livewire page', function () {
         ->set('broadcastFromPrefix', 'juniyadi')
         ->set('broadcastFromDomain', 'marketing.test.com')
         ->set('broadcastMessagesPerMinute', 2)
-        ->set('broadcastStartsAt', '2026-02-12T10:30')
+        ->set('broadcastStartDate', '2026-02-12')
+        ->set('broadcastStartTime', '10:30')
+        ->set('broadcastStartsAtTimezone', 'Asia/Jakarta')
         ->call('createBroadcast')
         ->assertHasNoErrors();
 
@@ -47,6 +49,8 @@ it('creates a broadcast from livewire page', function () {
         'from_domain' => 'marketing.test.com',
         'messages_per_minute' => 2,
         'status' => 'scheduled',
+        'starts_at' => '2026-02-12 03:30:00',
+        'starts_at_timezone' => 'Asia/Jakarta',
     ]);
 });
 
@@ -216,6 +220,8 @@ it('can open edit modal for scheduled broadcast', function () {
         'contact_group_id' => $group->id,
         'email_template_id' => $template->id,
         'status' => Broadcast::STATUS_SCHEDULED,
+        'starts_at' => '2026-03-15 07:00:00',
+        'starts_at_timezone' => 'Asia/Jakarta',
         'reply_to' => 'reply@test.com',
         'from_name' => 'Test Sender',
         'from_prefix' => 'test',
@@ -233,7 +239,10 @@ it('can open edit modal for scheduled broadcast', function () {
         ->assertSet('editBroadcastFromName', 'Test Sender')
         ->assertSet('editBroadcastFromPrefix', 'test')
         ->assertSet('editBroadcastFromDomain', 'marketing.test.com')
-        ->assertSet('editBroadcastMessagesPerMinute', 5);
+        ->assertSet('editBroadcastMessagesPerMinute', 5)
+        ->assertSet('editBroadcastStartDate', '2026-03-15')
+        ->assertSet('editBroadcastStartTime', '14:00')
+        ->assertSet('editBroadcastStartsAtTimezone', 'Asia/Jakarta');
 });
 
 it('can open edit modal for draft broadcast', function () {
@@ -346,12 +355,15 @@ it('can update broadcast schedule', function () {
 
     Livewire::test('pages::broadcasts.index')
         ->call('openEditBroadcastModal', $broadcast->id)
-        ->set('editBroadcastStartsAt', '2026-03-15T14:00')
+        ->set('editBroadcastStartDate', '2026-03-15')
+        ->set('editBroadcastStartTime', '14:00')
+        ->set('editBroadcastStartsAtTimezone', 'Asia/Jakarta')
         ->call('updateBroadcast')
         ->assertHasNoErrors();
 
     $broadcast->refresh();
-    expect($broadcast->starts_at->format('Y-m-d H:i'))->toBe('2026-03-15 14:00');
+    expect($broadcast->starts_at->format('Y-m-d H:i'))->toBe('2026-03-15 07:00')
+        ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
 });
 
 it('validates required fields on edit', function () {
