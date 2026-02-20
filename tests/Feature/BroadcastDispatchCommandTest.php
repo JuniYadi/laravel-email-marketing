@@ -83,6 +83,37 @@ it('promotes due scheduled broadcasts to running and snapshots template before d
     Queue::assertPushed(SendBroadcastRecipientMail::class, 1);
 });
 
+it('does not promote scheduled broadcasts when starts_at is still in the future', function () {
+    Queue::fake();
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_SCHEDULED,
+        'starts_at' => now()->addHour(),
+        'starts_at_timezone' => 'Asia/Jakarta',
+        'messages_per_minute' => 1,
+        'from_prefix' => 'juniyadi',
+        'from_domain' => 'marketing.test.com',
+    ]);
+
+    $contact = Contact::factory()->create(['is_invalid' => false]);
+    $group->contacts()->attach([$contact->id]);
+
+    $this->artisan('broadcasts:dispatch')->assertSuccessful();
+
+    $broadcast->refresh();
+
+    expect($broadcast->status)->toBe(Broadcast::STATUS_SCHEDULED)
+        ->and($broadcast->started_at)->toBeNull()
+        ->and($broadcast->recipients()->count())->toBe(0);
+
+    Queue::assertNothingPushed();
+});
+
 it('recovers stale queued recipients and dispatches them again', function () {
     Queue::fake();
 

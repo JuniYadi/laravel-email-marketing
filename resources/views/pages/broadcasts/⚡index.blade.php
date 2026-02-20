@@ -48,7 +48,11 @@ new class extends Component
 
     public int $editBroadcastMessagesPerMinute = 1;
 
-    public string $editBroadcastStartsAt = '';
+    public string $editBroadcastStartDate = '';
+
+    public string $editBroadcastStartTime = '';
+
+    public string $editBroadcastStartsAtTimezone = '';
 
     public string $broadcastName = '';
 
@@ -66,7 +70,11 @@ new class extends Component
 
     public int $broadcastMessagesPerMinute = 1;
 
-    public string $broadcastStartsAt = '';
+    public string $broadcastStartDate = '';
+
+    public string $broadcastStartTime = '';
+
+    public string $broadcastStartsAtTimezone = '';
 
     /**
      * Initialize defaults for broadcast form fields.
@@ -74,6 +82,7 @@ new class extends Component
     public function mount(): void
     {
         $this->broadcastFromDomain = $this->allowedDomains[0] ?? '';
+        $this->broadcastStartsAtTimezone = $this->defaultScheduleTimezone();
     }
 
     /**
@@ -98,7 +107,9 @@ new class extends Component
             'broadcastFromPrefix' => ['required', 'string', 'max:64'],
             'broadcastFromDomain' => ['required', 'string', Rule::in($this->allowedDomains)],
             'broadcastMessagesPerMinute' => ['required', 'integer', 'min:1'],
-            'broadcastStartsAt' => ['required', 'date'],
+            'broadcastStartDate' => ['required', 'date_format:Y-m-d'],
+            'broadcastStartTime' => ['required', 'date_format:H:i'],
+            'broadcastStartsAtTimezone' => ['required', 'timezone'],
         ]);
 
         $normalizedPrefix = Str::of($validated['broadcastFromPrefix'])
@@ -113,12 +124,20 @@ new class extends Component
             return;
         }
 
+        $scheduleTimezone = $this->resolveScheduleTimezone($validated['broadcastStartsAtTimezone']);
+        $startsAt = $this->buildUtcStartAt(
+            $validated['broadcastStartDate'],
+            $validated['broadcastStartTime'],
+            $scheduleTimezone,
+        );
+
         Broadcast::query()->create([
             'name' => $validated['broadcastName'],
             'contact_group_id' => (int) $validated['broadcastGroupId'],
             'email_template_id' => (int) $validated['broadcastTemplateId'],
             'status' => Broadcast::STATUS_SCHEDULED,
-            'starts_at' => Carbon::parse($validated['broadcastStartsAt']),
+            'starts_at' => $startsAt,
+            'starts_at_timezone' => $scheduleTimezone,
             'messages_per_minute' => (int) $validated['broadcastMessagesPerMinute'],
             'reply_to' => $validated['broadcastReplyTo'],
             'from_name' => $validated['broadcastFromName'],
@@ -259,7 +278,10 @@ new class extends Component
         $this->editBroadcastFromPrefix = $broadcast->from_prefix ?? '';
         $this->editBroadcastFromDomain = $broadcast->from_domain ?? $this->allowedDomains[0] ?? '';
         $this->editBroadcastMessagesPerMinute = $broadcast->messages_per_minute ?? 1;
-        $this->editBroadcastStartsAt = $broadcast->starts_at?->format('Y-m-d\TH:i') ?? '';
+        $editScheduleTimezone = $this->resolveScheduleTimezone($broadcast->starts_at_timezone);
+        $this->editBroadcastStartsAtTimezone = $editScheduleTimezone;
+        $this->editBroadcastStartDate = $broadcast->starts_at?->timezone($editScheduleTimezone)->format('Y-m-d') ?? '';
+        $this->editBroadcastStartTime = $broadcast->starts_at?->timezone($editScheduleTimezone)->format('H:i') ?? '';
         $this->showEditBroadcastModal = true;
     }
 
@@ -277,7 +299,9 @@ new class extends Component
             'editBroadcastFromPrefix' => ['required', 'string', 'max:64'],
             'editBroadcastFromDomain' => ['required', 'string', Rule::in($this->allowedDomains)],
             'editBroadcastMessagesPerMinute' => ['required', 'integer', 'min:1'],
-            'editBroadcastStartsAt' => ['required', 'date'],
+            'editBroadcastStartDate' => ['required', 'date_format:Y-m-d'],
+            'editBroadcastStartTime' => ['required', 'date_format:H:i'],
+            'editBroadcastStartsAtTimezone' => ['required', 'timezone'],
         ]);
 
         $normalizedPrefix = Str::of($validated['editBroadcastFromPrefix'])
@@ -292,6 +316,13 @@ new class extends Component
             return;
         }
 
+        $scheduleTimezone = $this->resolveScheduleTimezone($validated['editBroadcastStartsAtTimezone']);
+        $startsAt = $this->buildUtcStartAt(
+            $validated['editBroadcastStartDate'],
+            $validated['editBroadcastStartTime'],
+            $scheduleTimezone,
+        );
+
         $broadcast = Broadcast::query()->findOrFail($this->editingBroadcastId);
 
         if (! in_array($broadcast->status, [Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED], true)) {
@@ -304,7 +335,8 @@ new class extends Component
             'name' => $validated['editBroadcastName'],
             'contact_group_id' => (int) $validated['editBroadcastGroupId'],
             'email_template_id' => (int) $validated['editBroadcastTemplateId'],
-            'starts_at' => Carbon::parse($validated['editBroadcastStartsAt']),
+            'starts_at' => $startsAt,
+            'starts_at_timezone' => $scheduleTimezone,
             'messages_per_minute' => (int) $validated['editBroadcastMessagesPerMinute'],
             'reply_to' => $validated['editBroadcastReplyTo'],
             'from_name' => $validated['editBroadcastFromName'],
@@ -312,7 +344,18 @@ new class extends Component
             'from_domain' => $validated['editBroadcastFromDomain'],
         ]);
 
-        $this->reset('editingBroadcastId', 'editBroadcastName', 'editBroadcastGroupId', 'editBroadcastTemplateId', 'editBroadcastReplyTo', 'editBroadcastFromName', 'editBroadcastFromPrefix', 'editBroadcastStartsAt');
+        $this->reset(
+            'editingBroadcastId',
+            'editBroadcastName',
+            'editBroadcastGroupId',
+            'editBroadcastTemplateId',
+            'editBroadcastReplyTo',
+            'editBroadcastFromName',
+            'editBroadcastFromPrefix',
+            'editBroadcastStartDate',
+            'editBroadcastStartTime',
+            'editBroadcastStartsAtTimezone',
+        );
         $this->editBroadcastFromDomain = $this->allowedDomains[0] ?? '';
         $this->editBroadcastMessagesPerMinute = 1;
         $this->showEditBroadcastModal = false;
@@ -373,6 +416,7 @@ new class extends Component
                 'template_name',
                 'messages_per_minute',
                 'starts_at',
+                'starts_at_timezone',
                 'processed_recipients_count',
                 'total_recipients_count',
                 'status',
@@ -410,7 +454,8 @@ new class extends Component
                             $broadcast->email_template_id,
                             $broadcast->template?->name,
                             $broadcast->messages_per_minute,
-                            $broadcast->starts_at?->format('Y-m-d H:i:s'),
+                            $this->formatBroadcastStartAt($broadcast),
+                            $this->resolveScheduleTimezone($broadcast->starts_at_timezone),
                             (int) $broadcast->processed_recipients_count,
                             (int) $broadcast->total_recipients_count,
                             $broadcast->status,
@@ -440,11 +485,55 @@ new class extends Component
             'broadcastReplyTo',
             'broadcastFromName',
             'broadcastFromPrefix',
-            'broadcastStartsAt',
+            'broadcastStartDate',
+            'broadcastStartTime',
+            'broadcastStartsAtTimezone',
         );
 
         $this->broadcastFromDomain = $this->allowedDomains[0] ?? '';
         $this->broadcastMessagesPerMinute = 1;
+        $this->broadcastStartsAtTimezone = $this->defaultScheduleTimezone();
+    }
+
+    protected function defaultScheduleTimezone(): string
+    {
+        return (string) config('app.timezone', 'UTC');
+    }
+
+    protected function resolveScheduleTimezone(?string $timezone): string
+    {
+        $fallbackTimezone = $this->defaultScheduleTimezone();
+
+        if (! is_string($timezone) || $timezone === '') {
+            return $fallbackTimezone;
+        }
+
+        if (! in_array($timezone, $this->timezones, true)) {
+            return $fallbackTimezone;
+        }
+
+        return $timezone;
+    }
+
+    protected function buildUtcStartAt(string $date, string $time, string $timezone): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d H:i', sprintf('%s %s', $date, $time), $timezone)
+            ->utc();
+    }
+
+    public function formatBroadcastStartAt(Broadcast $broadcast): string
+    {
+        if ($broadcast->starts_at === null) {
+            return '-';
+        }
+
+        $scheduleTimezone = $this->resolveScheduleTimezone($broadcast->starts_at_timezone);
+
+        return sprintf(
+            '%s (%s)',
+            $broadcast->starts_at->timezone($scheduleTimezone)->format('Y-m-d H:i'),
+            $scheduleTimezone,
+        );
     }
 
     #[Computed]
@@ -488,6 +577,15 @@ new class extends Component
         }
 
         return ['example.com'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function timezones(): array
+    {
+        return \DateTimeZone::listIdentifiers();
     }
 
     #[Computed]
@@ -581,7 +679,7 @@ new class extends Component
                                     <td class="py-2 pe-3">{{ $broadcast->group?->name ?? '-' }}</td>
                                     <td class="py-2 pe-3">{{ $broadcast->template?->name ?? '-' }}</td>
                                     <td class="py-2 pe-3">{{ $broadcast->messages_per_minute }}/min</td>
-                                    <td class="py-2 pe-3">{{ $broadcast->starts_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                                    <td class="py-2 pe-3">{{ $this->formatBroadcastStartAt($broadcast) }}</td>
                                     <td class="py-2 pe-3">{{ $processedCount }}/{{ $totalRecipients }}</td>
                                     <td class="py-2 pe-3">
                                         @if ($broadcast->status === Broadcast::STATUS_RUNNING)
@@ -728,10 +826,27 @@ new class extends Component
                     </flux:field>
                 </div>
 
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid gap-4 md:grid-cols-3">
                     <flux:input wire:model="broadcastMessagesPerMinute" :label="__('Messages Per Minute')" type="number" min="1" required />
-                    <flux:input wire:model="broadcastStartsAt" :label="__('Starts At')" type="datetime-local" required />
+                    <flux:input wire:model="broadcastStartDate" :label="__('Start Date')" type="date" required />
+                    <flux:input wire:model="broadcastStartTime" :label="__('Start Time')" type="time" required />
                 </div>
+                <flux:field>
+                    <flux:label>{{ __('Schedule Timezone') }}</flux:label>
+                    <flux:select wire:model="broadcastStartsAtTimezone" required>
+                        @foreach ($this->timezones as $timezone)
+                            <flux:select.option wire:key="broadcast-timezone-{{ $timezone }}" value="{{ $timezone }}">
+                                {{ $timezone }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:text class="mt-1 text-xs text-zinc-500">
+                        {{ __('Dispatch checks run in UTC. Your selected timezone is converted to UTC automatically.') }}
+                    </flux:text>
+                    <flux:error name="broadcastStartDate" />
+                    <flux:error name="broadcastStartTime" />
+                    <flux:error name="broadcastStartsAtTimezone" />
+                </flux:field>
 
                 <div class="flex items-center justify-end gap-2">
                     <flux:button wire:click="$set('showCreateBroadcastModal', false)" variant="ghost" type="button">
@@ -870,10 +985,27 @@ new class extends Component
                     </flux:field>
                 </div>
 
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid gap-4 md:grid-cols-3">
                     <flux:input wire:model="editBroadcastMessagesPerMinute" :label="__('Messages Per Minute')" type="number" min="1" required />
-                    <flux:input wire:model="editBroadcastStartsAt" :label="__('Starts At')" type="datetime-local" required />
+                    <flux:input wire:model="editBroadcastStartDate" :label="__('Start Date')" type="date" required />
+                    <flux:input wire:model="editBroadcastStartTime" :label="__('Start Time')" type="time" required />
                 </div>
+                <flux:field>
+                    <flux:label>{{ __('Schedule Timezone') }}</flux:label>
+                    <flux:select wire:model="editBroadcastStartsAtTimezone" required>
+                        @foreach ($this->timezones as $timezone)
+                            <flux:select.option wire:key="edit-broadcast-timezone-{{ $timezone }}" value="{{ $timezone }}">
+                                {{ $timezone }}
+                            </flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:text class="mt-1 text-xs text-zinc-500">
+                        {{ __('Dispatch checks run in UTC. Your selected timezone is converted to UTC automatically.') }}
+                    </flux:text>
+                    <flux:error name="editBroadcastStartDate" />
+                    <flux:error name="editBroadcastStartTime" />
+                    <flux:error name="editBroadcastStartsAtTimezone" />
+                </flux:field>
 
                 <div class="flex items-center justify-end gap-2">
                     <flux:button wire:click="$set('showEditBroadcastModal', false)" variant="ghost" type="button">

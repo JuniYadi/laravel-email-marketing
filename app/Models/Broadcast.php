@@ -35,6 +35,7 @@ class Broadcast extends Model
         'email_template_id',
         'status',
         'starts_at',
+        'starts_at_timezone',
         'messages_per_minute',
         'reply_to',
         'from_name',
