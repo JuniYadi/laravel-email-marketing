@@ -27,6 +27,7 @@ class BroadcastFactory extends Factory
             'email_template_id' => EmailTemplate::factory(),
             'status' => Broadcast::STATUS_SCHEDULED,
             'starts_at' => now()->addHour(),
+            'starts_at_timezone' => (string) config('app.timezone', 'UTC'),
             'messages_per_minute' => 1,
             'reply_to' => fake()->safeEmail(),
             'from_name' => fake()->company(),
