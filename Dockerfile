@@ -80,7 +80,8 @@ RUN chmod +x /usr/local/bin/app-bootstrap.sh
 
 # Keep php-base entrypoint for dynamic secure runtime config.
 # Run app bootstrap, then launch php-base process supervisor loop.
-CMD ["sh", "-lc", "/usr/local/bin/app-bootstrap.sh && exec /usr/local/bin/start.sh"]
+# php-base startup script location can differ between image revisions.
+CMD ["sh", "-lc", "/usr/local/bin/app-bootstrap.sh && if command -v start.sh >/dev/null 2>&1; then exec \"$(command -v start.sh)\"; elif [ -x /usr/local/bin/start.sh ]; then exec /usr/local/bin/start.sh; elif [ -x /start.sh ]; then exec /start.sh; else echo \"ERROR: php-base start script not found\"; ls -la /usr/local/bin; exit 127; fi"]
 
 # OCI image description
 LABEL org.opencontainers.image.description="${DESCRIPTION:-Laravel Marketing Mail Application}"
