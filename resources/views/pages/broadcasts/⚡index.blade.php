@@ -48,6 +48,8 @@ new class extends Component
 
     public int $editBroadcastMessagesPerMinute = 1;
 
+    public string $editBroadcastStatus = Broadcast::STATUS_SCHEDULED;
+
     public string $editBroadcastStartDate = '';
 
     public string $editBroadcastStartTime = '';
@@ -69,6 +71,8 @@ new class extends Component
     public string $broadcastFromDomain = '';
 
     public int $broadcastMessagesPerMinute = 1;
+
+    public string $broadcastStatus = Broadcast::STATUS_SCHEDULED;
 
     public string $broadcastStartDate = '';
 
@@ -107,9 +111,10 @@ new class extends Component
             'broadcastFromPrefix' => ['required', 'string', 'max:64'],
             'broadcastFromDomain' => ['required', 'string', Rule::in($this->allowedDomains)],
             'broadcastMessagesPerMinute' => ['required', 'integer', 'min:1'],
-            'broadcastStartDate' => ['required', 'date_format:Y-m-d'],
-            'broadcastStartTime' => ['required', 'date_format:H:i'],
-            'broadcastStartsAtTimezone' => ['required', 'timezone'],
+            'broadcastStatus' => ['required', Rule::in([Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED])],
+            'broadcastStartDate' => ['nullable', 'date_format:Y-m-d', 'required_if:broadcastStatus,'.Broadcast::STATUS_SCHEDULED],
+            'broadcastStartTime' => ['nullable', 'date_format:H:i', 'required_if:broadcastStatus,'.Broadcast::STATUS_SCHEDULED],
+            'broadcastStartsAtTimezone' => ['nullable', 'timezone', 'required_if:broadcastStatus,'.Broadcast::STATUS_SCHEDULED],
         ]);
 
         $normalizedPrefix = Str::of($validated['broadcastFromPrefix'])
@@ -124,18 +129,25 @@ new class extends Component
             return;
         }
 
-        $scheduleTimezone = $this->resolveScheduleTimezone($validated['broadcastStartsAtTimezone']);
-        $startsAt = $this->buildUtcStartAt(
-            $validated['broadcastStartDate'],
-            $validated['broadcastStartTime'],
-            $scheduleTimezone,
-        );
+        $hasSchedule = filled($validated['broadcastStartDate'])
+            && filled($validated['broadcastStartTime'])
+            && filled($validated['broadcastStartsAtTimezone']);
+        $scheduleTimezone = $hasSchedule
+            ? $this->resolveScheduleTimezone($validated['broadcastStartsAtTimezone'])
+            : null;
+        $startsAt = $hasSchedule
+            ? $this->buildUtcStartAt(
+                $validated['broadcastStartDate'],
+                $validated['broadcastStartTime'],
+                $scheduleTimezone,
+            )
+            : null;
 
         Broadcast::query()->create([
             'name' => $validated['broadcastName'],
             'contact_group_id' => (int) $validated['broadcastGroupId'],
             'email_template_id' => (int) $validated['broadcastTemplateId'],
-            'status' => Broadcast::STATUS_SCHEDULED,
+            'status' => $validated['broadcastStatus'],
             'starts_at' => $startsAt,
             'starts_at_timezone' => $scheduleTimezone,
             'messages_per_minute' => (int) $validated['broadcastMessagesPerMinute'],
@@ -278,6 +290,7 @@ new class extends Component
         $this->editBroadcastFromPrefix = $broadcast->from_prefix ?? '';
         $this->editBroadcastFromDomain = $broadcast->from_domain ?? $this->allowedDomains[0] ?? '';
         $this->editBroadcastMessagesPerMinute = $broadcast->messages_per_minute ?? 1;
+        $this->editBroadcastStatus = $broadcast->status;
         $editScheduleTimezone = $this->resolveScheduleTimezone($broadcast->starts_at_timezone);
         $this->editBroadcastStartsAtTimezone = $editScheduleTimezone;
         $this->editBroadcastStartDate = $broadcast->starts_at?->timezone($editScheduleTimezone)->format('Y-m-d') ?? '';
@@ -299,9 +312,10 @@ new class extends Component
             'editBroadcastFromPrefix' => ['required', 'string', 'max:64'],
             'editBroadcastFromDomain' => ['required', 'string', Rule::in($this->allowedDomains)],
             'editBroadcastMessagesPerMinute' => ['required', 'integer', 'min:1'],
-            'editBroadcastStartDate' => ['required', 'date_format:Y-m-d'],
-            'editBroadcastStartTime' => ['required', 'date_format:H:i'],
-            'editBroadcastStartsAtTimezone' => ['required', 'timezone'],
+            'editBroadcastStatus' => ['required', Rule::in([Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED])],
+            'editBroadcastStartDate' => ['nullable', 'date_format:Y-m-d', 'required_if:editBroadcastStatus,'.Broadcast::STATUS_SCHEDULED],
+            'editBroadcastStartTime' => ['nullable', 'date_format:H:i', 'required_if:editBroadcastStatus,'.Broadcast::STATUS_SCHEDULED],
+            'editBroadcastStartsAtTimezone' => ['nullable', 'timezone', 'required_if:editBroadcastStatus,'.Broadcast::STATUS_SCHEDULED],
         ]);
 
         $normalizedPrefix = Str::of($validated['editBroadcastFromPrefix'])
@@ -316,12 +330,19 @@ new class extends Component
             return;
         }
 
-        $scheduleTimezone = $this->resolveScheduleTimezone($validated['editBroadcastStartsAtTimezone']);
-        $startsAt = $this->buildUtcStartAt(
-            $validated['editBroadcastStartDate'],
-            $validated['editBroadcastStartTime'],
-            $scheduleTimezone,
-        );
+        $hasSchedule = filled($validated['editBroadcastStartDate'])
+            && filled($validated['editBroadcastStartTime'])
+            && filled($validated['editBroadcastStartsAtTimezone']);
+        $scheduleTimezone = $hasSchedule
+            ? $this->resolveScheduleTimezone($validated['editBroadcastStartsAtTimezone'])
+            : null;
+        $startsAt = $hasSchedule
+            ? $this->buildUtcStartAt(
+                $validated['editBroadcastStartDate'],
+                $validated['editBroadcastStartTime'],
+                $scheduleTimezone,
+            )
+            : null;
 
         $broadcast = Broadcast::query()->findOrFail($this->editingBroadcastId);
 
@@ -335,6 +356,7 @@ new class extends Component
             'name' => $validated['editBroadcastName'],
             'contact_group_id' => (int) $validated['editBroadcastGroupId'],
             'email_template_id' => (int) $validated['editBroadcastTemplateId'],
+            'status' => $validated['editBroadcastStatus'],
             'starts_at' => $startsAt,
             'starts_at_timezone' => $scheduleTimezone,
             'messages_per_minute' => (int) $validated['editBroadcastMessagesPerMinute'],
@@ -352,12 +374,14 @@ new class extends Component
             'editBroadcastReplyTo',
             'editBroadcastFromName',
             'editBroadcastFromPrefix',
+            'editBroadcastStatus',
             'editBroadcastStartDate',
             'editBroadcastStartTime',
             'editBroadcastStartsAtTimezone',
         );
         $this->editBroadcastFromDomain = $this->allowedDomains[0] ?? '';
         $this->editBroadcastMessagesPerMinute = 1;
+        $this->editBroadcastStatus = Broadcast::STATUS_SCHEDULED;
         $this->showEditBroadcastModal = false;
         $this->dispatch('broadcast-updated');
     }
@@ -485,6 +509,7 @@ new class extends Component
             'broadcastReplyTo',
             'broadcastFromName',
             'broadcastFromPrefix',
+            'broadcastStatus',
             'broadcastStartDate',
             'broadcastStartTime',
             'broadcastStartsAtTimezone',
@@ -492,6 +517,7 @@ new class extends Component
 
         $this->broadcastFromDomain = $this->allowedDomains[0] ?? '';
         $this->broadcastMessagesPerMinute = 1;
+        $this->broadcastStatus = Broadcast::STATUS_SCHEDULED;
         $this->broadcastStartsAtTimezone = $this->defaultScheduleTimezone();
     }
 
@@ -682,7 +708,9 @@ new class extends Component
                                     <td class="py-2 pe-3">{{ $this->formatBroadcastStartAt($broadcast) }}</td>
                                     <td class="py-2 pe-3">{{ $processedCount }}/{{ $totalRecipients }}</td>
                                     <td class="py-2 pe-3">
-                                        @if ($broadcast->status === Broadcast::STATUS_RUNNING)
+                                        @if ($broadcast->status === Broadcast::STATUS_DRAFT)
+                                            <flux:badge color="zinc" size="sm">{{ __('Draft') }}</flux:badge>
+                                        @elseif ($broadcast->status === Broadcast::STATUS_RUNNING)
                                             <flux:badge color="emerald" size="sm">{{ __('Running') }}</flux:badge>
                                         @elseif ($broadcast->status === Broadcast::STATUS_PAUSED)
                                             <flux:badge color="amber" size="sm">{{ __('Paused') }}</flux:badge>
@@ -696,9 +724,9 @@ new class extends Component
                                     </td>
                                     <td class="py-2">
                                         <div class="flex items-center gap-2">
-                                            @if ($broadcast->status === Broadcast::STATUS_SCHEDULED)
-                                                <flux:button wire:click="startBroadcast({{ $broadcast->id }})" size="sm" variant="primary">
-                                                    {{ __('Start') }}
+                                            @if ($broadcast->status === Broadcast::STATUS_DRAFT)
+                                                <flux:button wire:click="openEditBroadcastModal({{ $broadcast->id }})" size="sm" variant="primary">
+                                                    {{ __('Schedule') }}
                                                 </flux:button>
                                             @elseif ($broadcast->status === Broadcast::STATUS_RUNNING)
                                                 <flux:button wire:click="pauseBroadcast({{ $broadcast->id }})" size="sm" variant="ghost">
@@ -717,6 +745,10 @@ new class extends Component
                                                     @if (in_array($broadcast->status, [Broadcast::STATUS_DRAFT, Broadcast::STATUS_SCHEDULED]))
                                                         <flux:menu.item wire:click="openEditBroadcastModal({{ $broadcast->id }})" icon="pencil">
                                                             {{ __('Edit') }}
+                                                        </flux:menu.item>
+
+                                                        <flux:menu.item wire:click="startBroadcast({{ $broadcast->id }})" icon="bolt">
+                                                            {{ __('Send Now') }}
                                                         </flux:menu.item>
                                                     @endif
 
@@ -766,6 +798,15 @@ new class extends Component
 
             <form wire:submit="createBroadcast" class="space-y-4">
                 <flux:input wire:model="broadcastName" :label="__('Name')" type="text" required autofocus />
+
+                <flux:field>
+                    <flux:label>{{ __('Status') }}</flux:label>
+                    <flux:select wire:model="broadcastStatus" required>
+                        <flux:select.option :value="Broadcast::STATUS_SCHEDULED">{{ __('Scheduled') }}</flux:select.option>
+                        <flux:select.option :value="Broadcast::STATUS_DRAFT">{{ __('Draft') }}</flux:select.option>
+                    </flux:select>
+                    <flux:error name="broadcastStatus" />
+                </flux:field>
 
                 <flux:field>
                     <flux:label>{{ __('Group') }}</flux:label>
@@ -828,12 +869,12 @@ new class extends Component
 
                 <div class="grid gap-4 md:grid-cols-3">
                     <flux:input wire:model="broadcastMessagesPerMinute" :label="__('Messages Per Minute')" type="number" min="1" required />
-                    <flux:input wire:model="broadcastStartDate" :label="__('Start Date')" type="date" required />
-                    <flux:input wire:model="broadcastStartTime" :label="__('Start Time')" type="time" required />
+                    <flux:input wire:model="broadcastStartDate" :label="__('Start Date')" type="date" />
+                    <flux:input wire:model="broadcastStartTime" :label="__('Start Time')" type="time" />
                 </div>
                 <flux:field>
                     <flux:label>{{ __('Schedule Timezone') }}</flux:label>
-                    <flux:select wire:model="broadcastStartsAtTimezone" required>
+                    <flux:select wire:model="broadcastStartsAtTimezone">
                         @foreach ($this->timezones as $timezone)
                             <flux:select.option wire:key="broadcast-timezone-{{ $timezone }}" value="{{ $timezone }}">
                                 {{ $timezone }}
@@ -853,7 +894,7 @@ new class extends Component
                         {{ __('Cancel') }}
                     </flux:button>
                     <flux:button variant="primary" type="submit">
-                        {{ __('Save Broadcast') }}
+                        {{ $broadcastStatus === Broadcast::STATUS_DRAFT ? __('Save Draft') : __('Schedule Broadcast') }}
                     </flux:button>
                 </div>
             </form>
@@ -939,6 +980,15 @@ new class extends Component
                 <flux:input wire:model="editBroadcastName" :label="__('Name')" type="text" required autofocus />
 
                 <flux:field>
+                    <flux:label>{{ __('Status') }}</flux:label>
+                    <flux:select wire:model="editBroadcastStatus" required>
+                        <flux:select.option :value="Broadcast::STATUS_SCHEDULED">{{ __('Scheduled') }}</flux:select.option>
+                        <flux:select.option :value="Broadcast::STATUS_DRAFT">{{ __('Draft') }}</flux:select.option>
+                    </flux:select>
+                    <flux:error name="editBroadcastStatus" />
+                </flux:field>
+
+                <flux:field>
                     <flux:label>{{ __('Group') }}</flux:label>
                     <flux:select wire:model="editBroadcastGroupId" required>
                         <flux:select.option value="">{{ __('Choose Group') }}</flux:select.option>
@@ -987,12 +1037,12 @@ new class extends Component
 
                 <div class="grid gap-4 md:grid-cols-3">
                     <flux:input wire:model="editBroadcastMessagesPerMinute" :label="__('Messages Per Minute')" type="number" min="1" required />
-                    <flux:input wire:model="editBroadcastStartDate" :label="__('Start Date')" type="date" required />
-                    <flux:input wire:model="editBroadcastStartTime" :label="__('Start Time')" type="time" required />
+                    <flux:input wire:model="editBroadcastStartDate" :label="__('Start Date')" type="date" />
+                    <flux:input wire:model="editBroadcastStartTime" :label="__('Start Time')" type="time" />
                 </div>
                 <flux:field>
                     <flux:label>{{ __('Schedule Timezone') }}</flux:label>
-                    <flux:select wire:model="editBroadcastStartsAtTimezone" required>
+                    <flux:select wire:model="editBroadcastStartsAtTimezone">
                         @foreach ($this->timezones as $timezone)
                             <flux:select.option wire:key="edit-broadcast-timezone-{{ $timezone }}" value="{{ $timezone }}">
                                 {{ $timezone }}
@@ -1012,7 +1062,7 @@ new class extends Component
                         {{ __('Cancel') }}
                     </flux:button>
                     <flux:button variant="primary" type="submit">
-                        {{ __('Update Broadcast') }}
+                        {{ $editBroadcastStatus === Broadcast::STATUS_DRAFT ? __('Update Draft') : __('Update Schedule') }}
                     </flux:button>
                 </div>
             </form>
