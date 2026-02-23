@@ -114,7 +114,7 @@ it('renders history link for each broadcast row', function () {
 });
 
 // Dropdown visibility tests
-it('shows start button for scheduled broadcast', function () {
+it('shows scheduled status for scheduled broadcast', function () {
     config()->set('broadcast.allowed_domains', ['marketing.test.com']);
 
     $this->actingAs(User::factory()->create());
@@ -129,7 +129,25 @@ it('shows start button for scheduled broadcast', function () {
     ]);
 
     Livewire::test('pages::broadcasts.index')
-        ->assertSee('Start');
+        ->assertSee('Scheduled');
+});
+
+it('shows draft status for draft broadcast', function () {
+    config()->set('broadcast.allowed_domains', ['marketing.test.com']);
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_DRAFT,
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->assertSee('Draft');
 });
 
 it('shows pause button for running broadcast', function () {
@@ -240,6 +258,7 @@ it('can open edit modal for scheduled broadcast', function () {
         ->assertSet('editBroadcastFromPrefix', 'test')
         ->assertSet('editBroadcastFromDomain', 'marketing.test.com')
         ->assertSet('editBroadcastMessagesPerMinute', 5)
+        ->assertSet('editBroadcastStatus', Broadcast::STATUS_SCHEDULED)
         ->assertSet('editBroadcastStartDate', '2026-03-15')
         ->assertSet('editBroadcastStartTime', '14:00')
         ->assertSet('editBroadcastStartsAtTimezone', 'Asia/Jakarta');
@@ -355,6 +374,7 @@ it('can update broadcast schedule', function () {
 
     Livewire::test('pages::broadcasts.index')
         ->call('openEditBroadcastModal', $broadcast->id)
+        ->set('editBroadcastStatus', Broadcast::STATUS_SCHEDULED)
         ->set('editBroadcastStartDate', '2026-03-15')
         ->set('editBroadcastStartTime', '14:00')
         ->set('editBroadcastStartsAtTimezone', 'Asia/Jakarta')
@@ -364,6 +384,110 @@ it('can update broadcast schedule', function () {
     $broadcast->refresh();
     expect($broadcast->starts_at->format('Y-m-d H:i'))->toBe('2026-03-15 07:00')
         ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
+});
+
+it('moves draft broadcast to scheduled after updating schedule', function () {
+    config()->set('broadcast.allowed_domains', ['marketing.test.com']);
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_DRAFT,
+        'reply_to' => 'reply@test.com',
+        'from_name' => 'Sender',
+        'from_prefix' => 'test',
+        'from_domain' => 'marketing.test.com',
+        'messages_per_minute' => 1,
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->call('openEditBroadcastModal', $broadcast->id)
+        ->set('editBroadcastStatus', Broadcast::STATUS_SCHEDULED)
+        ->set('editBroadcastStartDate', '2026-03-15')
+        ->set('editBroadcastStartTime', '14:00')
+        ->set('editBroadcastStartsAtTimezone', 'Asia/Jakarta')
+        ->call('updateBroadcast')
+        ->assertHasNoErrors();
+
+    $broadcast->refresh();
+    expect($broadcast->status)->toBe(Broadcast::STATUS_SCHEDULED)
+        ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
+});
+
+it('keeps draft status while allowing schedule fields to be updated', function () {
+    config()->set('broadcast.allowed_domains', ['marketing.test.com']);
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_DRAFT,
+        'reply_to' => 'reply@test.com',
+        'from_name' => 'Sender',
+        'from_prefix' => 'test',
+        'from_domain' => 'marketing.test.com',
+        'messages_per_minute' => 1,
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->call('openEditBroadcastModal', $broadcast->id)
+        ->set('editBroadcastStatus', Broadcast::STATUS_DRAFT)
+        ->set('editBroadcastStartDate', '2026-03-15')
+        ->set('editBroadcastStartTime', '14:00')
+        ->set('editBroadcastStartsAtTimezone', 'Asia/Jakarta')
+        ->call('updateBroadcast')
+        ->assertHasNoErrors();
+
+    $broadcast->refresh();
+    expect($broadcast->status)->toBe(Broadcast::STATUS_DRAFT)
+        ->and($broadcast->starts_at?->format('Y-m-d H:i'))->toBe('2026-03-15 07:00')
+        ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
+});
+
+it('can create a draft broadcast without schedule date', function () {
+    config()->set('broadcast.allowed_domains', ['test.com', 'marketing.test.com']);
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create([
+        'subject' => 'Welcome {{ first_name }}',
+        'html_content' => '<h1>Hello {{ first_name }}</h1>',
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->set('broadcastName', 'Draft Campaign')
+        ->set('broadcastGroupId', (string) $group->id)
+        ->set('broadcastTemplateId', (string) $template->id)
+        ->set('broadcastReplyTo', 'reply@example.com')
+        ->set('broadcastFromName', 'Marketing Team')
+        ->set('broadcastFromPrefix', 'juniyadi')
+        ->set('broadcastFromDomain', 'marketing.test.com')
+        ->set('broadcastMessagesPerMinute', 2)
+        ->set('broadcastStatus', Broadcast::STATUS_DRAFT)
+        ->set('broadcastStartDate', '')
+        ->set('broadcastStartTime', '')
+        ->set('broadcastStartsAtTimezone', '')
+        ->call('createBroadcast')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('broadcasts', [
+        'name' => 'Draft Campaign',
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_DRAFT,
+        'starts_at' => null,
+        'starts_at_timezone' => null,
+    ]);
 });
 
 it('validates required fields on edit', function () {
