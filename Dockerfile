@@ -50,6 +50,8 @@ RUN rm -rf bootstrap/cache/*.php
 # ===============================================
 FROM ghcr.io/juniyadi/php-base:8.5
 
+WORKDIR /var/www/html
+
 # Enable required extensions via environment variables
 ENV PHP_EXT_bcmath=1
 ENV PHP_EXT_pgsql=1
@@ -58,30 +60,24 @@ ENV PHP_EXT_pdo_pgsql=1
 # Trust Cloudflare proxy - enables real IP forwarding in nginx
 ENV NGINX_TRUST_CLOUDFLARE=1
 
-# Install app runtime dependencies
-RUN apt-get update && apt-get install -y cron netcat-openbsd && rm -rf /var/lib/apt/lists/*
-
 # Copy built application from builder
 COPY --from=builder --chown=www-data:www-data /app /var/www/html
 
 # Set permissions for storage and cache
 RUN chmod -R 775 storage bootstrap/cache || true
 
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    NGINX_DOCROOT=/var/www/html/public \
+    NGINX_FRONT_CONTROLLER="/index.php?\$query_string" \
+    PHP_MEMORY_LIMIT=256M \
+    PHP_UPLOAD_LIMIT=64M \
+    APP_BOOTSTRAP_CMD="if [ \"\$RUN_MIGRATIONS\" = \"true\" ]; then php artisan migrate --force; fi && php artisan config:cache || true && php artisan route:cache || true && php artisan view:cache || true"
+
 # Copy app-specific Supervisor programs (php-base keeps core supervisord config)
 COPY docker/supervisor/app-services.conf /etc/supervisor.d/app-services.conf
 
-# Copy crontab file
-COPY docker/crontab /etc/cron.d/laravel
-RUN chmod 0644 /etc/cron.d/laravel && crontab /etc/cron.d/laravel
-
-# Copy app bootstrap hook that runs before php-base start.sh
-COPY docker/app-bootstrap.sh /usr/local/bin/app-bootstrap.sh
-RUN chmod +x /usr/local/bin/app-bootstrap.sh
-
-# Keep php-base entrypoint for dynamic secure runtime config.
-# Run app bootstrap, then launch php-base process supervisor loop.
-# php-base startup script location can differ between image revisions.
-CMD ["sh", "-lc", "/usr/local/bin/app-bootstrap.sh && if command -v start.sh >/dev/null 2>&1; then exec \"$(command -v start.sh)\"; elif [ -x /usr/local/bin/start.sh ]; then exec /usr/local/bin/start.sh; elif [ -x /start.sh ]; then exec /start.sh; else echo \"ERROR: php-base start script not found\"; ls -la /usr/local/bin; exit 127; fi"]
+EXPOSE 80
 
 # OCI image description
 LABEL org.opencontainers.image.description="${DESCRIPTION:-Laravel Marketing Mail Application}"
