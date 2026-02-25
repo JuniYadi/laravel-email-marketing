@@ -83,6 +83,42 @@ it('promotes due scheduled broadcasts to running and snapshots template before d
     Queue::assertPushed(SendBroadcastRecipientMail::class, 1);
 });
 
+it('promotes scheduled broadcasts using UTC comparison regardless of app timezone', function () {
+    Queue::fake();
+
+    // Simulate an app timezone of Asia/Jakarta (UTC+7)
+    config()->set('app.timezone', 'Asia/Jakarta');
+
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+
+    // starts_at is stored in UTC (already past) but Jakarta local-time string would be 7 hours ahead
+    $startsAtUtc = now()->utc()->subMinute();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_SCHEDULED,
+        'starts_at' => $startsAtUtc,
+        'starts_at_timezone' => 'Asia/Jakarta',
+        'messages_per_minute' => 1,
+        'from_prefix' => 'juniyadi',
+        'from_domain' => 'marketing.test.com',
+    ]);
+
+    $contact = Contact::factory()->create(['is_invalid' => false]);
+    $group->contacts()->attach([$contact->id]);
+
+    $this->artisan('broadcasts:dispatch')->assertSuccessful();
+
+    $broadcast->refresh();
+
+    expect($broadcast->status)->toBe(Broadcast::STATUS_RUNNING)
+        ->and($broadcast->started_at)->not->toBeNull();
+
+    Queue::assertPushed(SendBroadcastRecipientMail::class);
+});
+
 it('does not promote scheduled broadcasts when starts_at is still in the future', function () {
     Queue::fake();
 
