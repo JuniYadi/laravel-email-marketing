@@ -57,7 +57,7 @@ class DispatchBroadcastsCommand extends Command
             ->where('status', Broadcast::STATUS_SCHEDULED)
             ->where(function ($query): void {
                 $query->whereNull('starts_at')
-                    ->orWhere('starts_at', '<=', now());
+                    ->orWhere('starts_at', '<=', now()->utc());
             })
             ->orderBy('id')
             ->each(function (Broadcast $broadcast): void {
