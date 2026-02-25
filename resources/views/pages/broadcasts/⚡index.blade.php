@@ -129,7 +129,8 @@ new class extends Component
             return;
         }
 
-        $hasSchedule = filled($validated['broadcastStartDate'])
+        $hasSchedule = $validated['broadcastStatus'] === Broadcast::STATUS_SCHEDULED
+            && filled($validated['broadcastStartDate'])
             && filled($validated['broadcastStartTime'])
             && filled($validated['broadcastStartsAtTimezone']);
         $scheduleTimezone = $hasSchedule
@@ -330,7 +331,8 @@ new class extends Component
             return;
         }
 
-        $hasSchedule = filled($validated['editBroadcastStartDate'])
+        $hasSchedule = $validated['editBroadcastStatus'] === Broadcast::STATUS_SCHEDULED
+            && filled($validated['editBroadcastStartDate'])
             && filled($validated['editBroadcastStartTime'])
             && filled($validated['editBroadcastStartsAtTimezone']);
         $scheduleTimezone = $hasSchedule
