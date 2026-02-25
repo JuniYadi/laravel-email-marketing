@@ -419,7 +419,7 @@ it('moves draft broadcast to scheduled after updating schedule', function () {
         ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
 });
 
-it('keeps draft status while allowing schedule fields to be updated', function () {
+it('keeps draft status and clears schedule fields on update', function () {
     config()->set('broadcast.allowed_domains', ['marketing.test.com']);
 
     $this->actingAs(User::factory()->create());
@@ -449,8 +449,8 @@ it('keeps draft status while allowing schedule fields to be updated', function (
 
     $broadcast->refresh();
     expect($broadcast->status)->toBe(Broadcast::STATUS_DRAFT)
-        ->and($broadcast->starts_at?->format('Y-m-d H:i'))->toBe('2026-03-15 07:00')
-        ->and($broadcast->starts_at_timezone)->toBe('Asia/Jakarta');
+        ->and($broadcast->starts_at)->toBeNull()
+        ->and($broadcast->starts_at_timezone)->toBeNull();
 });
 
 it('can create a draft broadcast without schedule date', function () {
@@ -559,4 +559,31 @@ it('downloads broadcasts as csv', function () {
     Livewire::test('pages::broadcasts.index')
         ->call('exportCsv')
         ->assertFileDownloaded();
+});
+
+it('renders starts_at using app timezone when starts_at_timezone is missing', function () {
+    config()->set('broadcast.allowed_domains', ['marketing.test.com']);
+    config()->set('app.timezone', 'Asia/Jakarta');
+
+    $this->actingAs(User::factory()->create());
+
+    $group = ContactGroup::factory()->create(['name' => 'VIP']);
+    $template = EmailTemplate::factory()->create(['name' => 'Launch']);
+
+    Broadcast::factory()->create([
+        'name' => 'Timezone Fallback',
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_SCHEDULED,
+        'starts_at' => '2026-03-15 07:00:00',
+        'starts_at_timezone' => null,
+        'reply_to' => 'reply@test.com',
+        'from_name' => 'Sender',
+        'from_prefix' => 'test',
+        'from_domain' => 'marketing.test.com',
+        'messages_per_minute' => 1,
+    ]);
+
+    Livewire::test('pages::broadcasts.index')
+        ->assertSee('2026-03-15 14:00 (Asia/Jakarta)');
 });
