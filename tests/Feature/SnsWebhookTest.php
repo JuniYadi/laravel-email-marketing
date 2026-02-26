@@ -270,3 +270,15 @@ it('maps sns delivery events into broadcast recipient tracking', function () {
         ->and($recipient->provider_message_id)->toBe('ses-message-1')
         ->and($recipient->delivered_at)->not->toBeNull();
 });
+
+it('returns json validation errors for invalid sns payloads without redirect', function () {
+    $response = $this->post('/api/webhooks/sns', []);
+
+    $response
+        ->assertStatus(422)
+        ->assertHeaderMissing('location')
+        ->assertJson([
+            'status' => 'failed',
+            'message' => 'Invalid SNS webhook payload.',
+        ]);
+});
