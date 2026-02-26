@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StoreSnsWebhookRequest extends FormRequest
 {
@@ -73,5 +75,19 @@ class StoreSnsWebhookRequest extends FormRequest
             'MessageId.required' => 'SNS webhook payload must include a MessageId field.',
             'Timestamp.date' => 'SNS webhook Timestamp must be a valid date value.',
         ];
+    }
+
+    /**
+     * Ensure webhook validation failures return JSON instead of redirects.
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'status' => 'failed',
+                'message' => 'Invalid SNS webhook payload.',
+                'errors' => $validator->errors(),
+            ], 422),
+        );
     }
 }

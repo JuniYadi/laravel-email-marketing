@@ -1,6 +1,7 @@
 <?php
 
 use App\Mail\BroadcastRecipientMail;
+use Illuminate\Mail\Mailables\Headers;
 
 it('includes list-unsubscribe headers', function () {
     $url = 'https://example.com/unsubscribe/1?signature=abc123';
@@ -17,10 +18,11 @@ it('includes list-unsubscribe headers', function () {
 
     $headers = $mail->headers();
 
-    expect($headers)->toHaveKey('List-Unsubscribe');
-    expect($headers)->toHaveKey('List-Unsubscribe-Post');
-    expect($headers['List-Unsubscribe'])->toBe('<'.$url.'>');
-    expect($headers['List-Unsubscribe-Post'])->toBe('List-Unsubscribe=One-Click');
+    expect($headers)->toBeInstanceOf(Headers::class);
+    expect($headers->text)->toHaveKey('List-Unsubscribe');
+    expect($headers->text)->toHaveKey('List-Unsubscribe-Post');
+    expect($headers->text['List-Unsubscribe'])->toBe('<'.$url.'>');
+    expect($headers->text['List-Unsubscribe-Post'])->toBe('List-Unsubscribe=One-Click');
 });
 
 it('returns empty headers when unsubscribe url is empty', function () {
@@ -36,5 +38,6 @@ it('returns empty headers when unsubscribe url is empty', function () {
 
     $headers = $mail->headers();
 
-    expect($headers)->toBe([]);
+    expect($headers)->toBeInstanceOf(Headers::class);
+    expect($headers->text)->toBe([]);
 });

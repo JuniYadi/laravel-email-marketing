@@ -7,6 +7,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 
@@ -90,18 +91,16 @@ class BroadcastRecipientMail extends Mailable
 
     /**
      * Get the message headers.
-     *
-     * @return array<string, string>
      */
-    public function headers(): array
+    public function headers(): Headers
     {
         if ($this->unsubscribeUrl === '') {
-            return [];
+            return new Headers;
         }
 
-        return [
+        return new Headers(text: [
             'List-Unsubscribe' => '<'.$this->unsubscribeUrl.'>',
             'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
-        ];
+        ]);
     }
 }
