@@ -1,0 +1,3 @@
+# Laravel Scheduler - Run every minute
+* * * * * echo "Cron running at $(date)" && /usr/local/bin/php /var/www/html/artisan schedule:run --no-interaction -vvv 2>&1
+

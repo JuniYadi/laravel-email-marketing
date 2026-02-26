@@ -76,6 +76,8 @@ ENV APP_ENV=production \
 
 # Copy app-specific Supervisor programs (php-base keeps core supervisord config)
 COPY docker/supervisor/app-services.conf /etc/supervisor.d/app-services.conf
+COPY docker/nginx/dynamic-routes.conf /etc/nginx/snippets/dynamic-routes.conf
+COPY docker/laravel-scheduler /etc/cron.d/laravel-scheduler
 
 EXPOSE 80
 
