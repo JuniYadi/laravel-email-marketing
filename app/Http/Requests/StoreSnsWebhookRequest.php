@@ -2,9 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SnsWebhookMessage;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Str;
+use Throwable;
 
 class StoreSnsWebhookRequest extends FormRequest
 {
@@ -82,6 +85,8 @@ class StoreSnsWebhookRequest extends FormRequest
      */
     protected function failedValidation(Validator $validator): void
     {
+        $this->storeFailedWebhookAttempt();
+
         throw new HttpResponseException(
             response()->json([
                 'status' => 'failed',
@@ -89,5 +94,49 @@ class StoreSnsWebhookRequest extends FormRequest
                 'errors' => $validator->errors(),
             ], 422),
         );
+    }
+
+    protected function storeFailedWebhookAttempt(): void
+    {
+        $rawBody = $this->getContent();
+        $decodedPayload = json_decode($rawBody, true);
+
+        if (! is_array($decodedPayload)) {
+            $decodedPayload = [
+                '_raw_body' => is_string($rawBody) ? $rawBody : '',
+            ];
+        }
+
+        $messageType = $this->input('Type')
+            ?? $this->header('x-amz-sns-message-type')
+            ?? 'Unknown';
+
+        $messageId = $this->input('MessageId')
+            ?? $this->header('x-amz-sns-message-id');
+
+        $topicArn = $this->input('TopicArn')
+            ?? $this->header('x-amz-sns-topic-arn');
+
+        try {
+            SnsWebhookMessage::query()->create([
+                'message_type' => Str::limit((string) $messageType, 120, ''),
+                'message_id' => $messageId !== null ? Str::limit((string) $messageId, 255, '') : null,
+                'topic_arn' => $topicArn !== null ? Str::limit((string) $topicArn, 255, '') : null,
+                'subject' => $this->input('Subject'),
+                'message' => $this->input('Message'),
+                'token' => $this->input('Token'),
+                'subscribe_url' => $this->input('SubscribeURL'),
+                'unsubscribe_url' => $this->input('UnsubscribeURL'),
+                'signature_version' => $this->input('SignatureVersion'),
+                'signature' => $this->input('Signature'),
+                'signing_cert_url' => $this->input('SigningCertURL'),
+                'sns_timestamp' => $this->input('Timestamp'),
+                'payload' => $decodedPayload,
+                'headers' => $this->headers->all(),
+                'raw_body' => is_string($rawBody) ? $rawBody : '',
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

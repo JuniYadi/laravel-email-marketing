@@ -281,4 +281,33 @@ it('returns json validation errors for invalid sns payloads without redirect', f
             'status' => 'failed',
             'message' => 'Invalid SNS webhook payload.',
         ]);
+
+    $this->assertDatabaseHas('sns_webhook_messages', [
+        'message_type' => 'Unknown',
+        'message_id' => null,
+    ]);
+});
+
+it('stores sns webhook logs even when validation fails', function () {
+    $response = $this->postJson('/api/webhooks/sns', [
+        'Type' => 'Notification',
+    ]);
+
+    $response
+        ->assertStatus(422)
+        ->assertJson([
+            'status' => 'failed',
+            'message' => 'Invalid SNS webhook payload.',
+        ]);
+
+    $this->assertDatabaseHas('sns_webhook_messages', [
+        'message_type' => 'Notification',
+        'message_id' => null,
+    ]);
+
+    $webhook = SnsWebhookMessage::query()->latest('id')->first();
+
+    expect($webhook)->not->toBeNull()
+        ->and(($webhook?->payload['Type'] ?? $webhook?->payload['_raw_body'] ?? null))->not->toBeNull()
+        ->and($webhook?->raw_body)->not->toBe('');
 });
