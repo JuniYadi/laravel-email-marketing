@@ -271,6 +271,90 @@ it('maps sns delivery events into broadcast recipient tracking', function () {
         ->and($recipient->delivered_at)->not->toBeNull();
 });
 
+it('maps raw ses open and click events into broadcast recipient tracking', function () {
+    $group = ContactGroup::factory()->create();
+    $template = EmailTemplate::factory()->create();
+    $contact = Contact::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'contact_group_id' => $group->id,
+        'email_template_id' => $template->id,
+    ]);
+
+    $recipient = BroadcastRecipient::factory()->create([
+        'broadcast_id' => $broadcast->id,
+        'contact_id' => $contact->id,
+        'email' => $contact->email,
+        'status' => BroadcastRecipient::STATUS_SENT,
+    ]);
+
+    $mailPayload = [
+        'timestamp' => '2026-02-26T08:47:00.173Z',
+        'messageId' => '010e019c9921444d-1f780570-d977-4893-9408-b757b0295f73-000000',
+        'destination' => [$contact->email],
+        'tags' => [
+            'broadcast_recipient_id' => [(string) $recipient->id],
+            'broadcast_id' => [(string) $broadcast->id],
+            'contact_id' => [(string) $contact->id],
+        ],
+    ];
+
+    $openResponse = $this->postJson('/api/webhooks/sns', [
+        'eventType' => 'Open',
+        'mail' => $mailPayload,
+        'open' => [
+            'timestamp' => '2026-02-27T08:01:19.017Z',
+            'userAgent' => 'Amazon CloudFront',
+            'ipAddress' => '66.249.84.33',
+        ],
+    ]);
+
+    $openResponse
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'Notification',
+        ]);
+
+    $clickResponse = $this->postJson('/api/webhooks/sns', [
+        'eventType' => 'Click',
+        'mail' => $mailPayload,
+        'click' => [
+            'timestamp' => '2026-02-27T08:03:09.470Z',
+            'ipAddress' => '114.8.220.38',
+            'userAgent' => 'Amazon CloudFront',
+            'link' => 'https://example.com',
+        ],
+    ]);
+
+    $clickResponse
+        ->assertSuccessful()
+        ->assertJson([
+            'status' => 'received',
+            'type' => 'Notification',
+        ]);
+
+    $this->assertDatabaseHas('broadcast_recipient_events', [
+        'broadcast_id' => $broadcast->id,
+        'broadcast_recipient_id' => $recipient->id,
+        'provider_message_id' => '010e019c9921444d-1f780570-d977-4893-9408-b757b0295f73-000000',
+        'event_type' => 'open',
+    ]);
+
+    $this->assertDatabaseHas('broadcast_recipient_events', [
+        'broadcast_id' => $broadcast->id,
+        'broadcast_recipient_id' => $recipient->id,
+        'provider_message_id' => '010e019c9921444d-1f780570-d977-4893-9408-b757b0295f73-000000',
+        'event_type' => 'click',
+    ]);
+
+    $recipient->refresh();
+
+    expect($recipient->status)->toBe(BroadcastRecipient::STATUS_CLICKED)
+        ->and($recipient->opened_at?->toIso8601String())->toBe('2026-02-27T08:01:19+00:00')
+        ->and($recipient->clicked_at?->toIso8601String())->toBe('2026-02-27T08:03:09+00:00');
+});
+
 it('returns json validation errors for invalid sns payloads without redirect', function () {
     $response = $this->post('/api/webhooks/sns', []);
 
