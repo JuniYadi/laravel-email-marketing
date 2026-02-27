@@ -716,6 +716,49 @@ php artisan queue:work
 
 ---
 
+## Custom Landing Page Domains
+
+Landing pages support both default slug URLs and custom domains:
+
+- Default URL: `https://your-app.com/events/{slug}`
+- Custom domain URL: `https://event.example.com/` or `https://marketing.example.com/`
+
+### 1. Configure environment variables
+
+Add these variables to your `.env`:
+
+```env
+# Exact domains that should serve landing pages at "/"
+LANDING_PAGE_DOMAINS=event.example.com,marketing.example.com
+
+# Optional wildcard root for subdomain routing
+# Example: supports any "{subdomain}.example.com"
+LANDING_PAGE_WILDCARD_ROOT=example.com
+```
+
+### 2. Run migrations and sync templates
+
+```bash
+php artisan migrate
+php artisan landing-pages:sync-templates --no-interaction
+```
+
+### 3. DNS and web server setup
+
+For each custom domain / subdomain:
+
+1. Point DNS (`A`/`CNAME`) to your application/load balancer.
+2. Ensure your web server / ingress accepts those hostnames.
+3. Install TLS certificates for those domains.
+
+### 4. Assign domain per landing page
+
+In **Landing Pages → Create/Edit**, set **Custom Domain (optional)**.
+If set, the page is served from the custom domain root (`/`).
+If empty, it stays on the default `/events/{slug}` route.
+
+---
+
 ## Environment Variables
 
 | Variable | Description | Required | Default |
@@ -741,6 +784,8 @@ php artisan queue:work
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | No | - |
 | `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No | /auth/google/callback |
 | `AUTH_MODE` | Authentication mode (both/google_only/manual_only) | No | both |
+| `LANDING_PAGE_DOMAINS` | Allowed exact landing-page domains (comma-separated) | No | event.example.com,marketing.example.com |
+| `LANDING_PAGE_WILDCARD_ROOT` | Optional wildcard root domain for landing pages | No | example.com |
 
 *Not required when using Kubernetes with IRSA (IAM Roles for Service Accounts)
 

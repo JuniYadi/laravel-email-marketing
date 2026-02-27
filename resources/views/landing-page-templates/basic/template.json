@@ -1,0 +1,18 @@
+{
+  "key": "basic",
+  "name": "Basic",
+  "description": "Base landing page template for users to extend.",
+  "version": 1,
+  "preview_image_url": "https://placehold.co/1200x800/F8FAFC/0F172A?text=Basic+Template",
+  "schema": {
+    "fields": [
+      { "key": "headline", "label": "Headline", "type": "text", "required": true, "max": 120, "default": "Create your first landing page" },
+      { "key": "body", "label": "Body", "type": "textarea", "required": true, "max": 500, "default": "This is the basic starter template. Update content and duplicate it to create custom variants." },
+      { "key": "cta_label", "label": "CTA Label", "type": "text", "required": true, "max": 40, "default": "Get Started" },
+      { "key": "cta_url", "label": "CTA URL", "type": "url", "required": true, "default": "https://example.com" },
+      { "key": "background_color", "label": "Background Color", "type": "color", "required": true, "default": "#0F172A" },
+      { "key": "show_badge", "label": "Show Badge", "type": "toggle", "required": false, "default": true },
+      { "key": "badge_text", "label": "Badge Text", "type": "text", "required": false, "max": 60, "default": "Base Template" }
+    ]
+  }
+}
