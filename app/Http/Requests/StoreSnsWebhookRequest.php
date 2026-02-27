@@ -17,6 +17,8 @@ class StoreSnsWebhookRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->input('Type') !== null) {
+            $this->normalizeMessageFieldIfNeeded();
+
             return;
         }
 
@@ -32,7 +34,7 @@ class StoreSnsWebhookRequest extends FormRequest
             return;
         }
 
-        $this->merge($decodedPayload);
+        $this->merge($this->normalizeIncomingPayload($decodedPayload));
     }
 
     /**
@@ -138,5 +140,60 @@ class StoreSnsWebhookRequest extends FormRequest
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    /**
+     * Convert raw SES event payloads into SNS Notification shape.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function normalizeIncomingPayload(array $payload): array
+    {
+        if (! isset($payload['eventType']) || ! is_array($payload['mail'] ?? null)) {
+            return $payload;
+        }
+
+        $mailMessageId = data_get($payload, 'mail.messageId');
+        $eventType = (string) ($payload['eventType'] ?? 'event');
+        $eventTimestamp = (string) ($this->resolveEventTimestamp($payload) ?? now()->toIso8601String());
+        $syntheticMessageId = hash('sha256', $eventType.'|'.$eventTimestamp.'|'.(string) $mailMessageId);
+
+        $normalizedMessage = json_encode($payload);
+
+        return [
+            'Type' => 'Notification',
+            'MessageId' => $syntheticMessageId,
+            'Message' => is_string($normalizedMessage) ? $normalizedMessage : '{}',
+            'Timestamp' => $eventTimestamp,
+        ];
+    }
+
+    protected function normalizeMessageFieldIfNeeded(): void
+    {
+        $message = $this->input('Message');
+
+        if (is_array($message)) {
+            $normalizedMessage = json_encode($message);
+
+            $this->merge([
+                'Message' => is_string($normalizedMessage) ? $normalizedMessage : '{}',
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function resolveEventTimestamp(array $payload): ?string
+    {
+        $timestamp = data_get($payload, 'delivery.timestamp')
+            ?? data_get($payload, 'bounce.timestamp')
+            ?? data_get($payload, 'complaint.timestamp')
+            ?? data_get($payload, 'open.timestamp')
+            ?? data_get($payload, 'click.timestamp')
+            ?? data_get($payload, 'mail.timestamp');
+
+        return is_string($timestamp) ? $timestamp : null;
     }
 }
