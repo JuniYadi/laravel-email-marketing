@@ -30,6 +30,9 @@
                 <flux:navbar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                     {{ __('Templates') }}
                 </flux:navbar.item>
+                <flux:navbar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.*')" wire:navigate>
+                    {{ __('Landing Pages') }}
+                </flux:navbar.item>
             </flux:navbar>
 
             <flux:spacer />
@@ -89,6 +92,9 @@
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.*')" wire:navigate>
+                        {{ __('Landing Pages') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
