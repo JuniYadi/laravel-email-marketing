@@ -598,7 +598,7 @@ new class extends Component {
                         <flux:text class="mt-2 text-sm">{{ __('Select a template to configure fields.') }}</flux:text>
                     @else
                         <div class="mt-3 space-y-3">
-                            @foreach ($this->fieldDefinitions as $field)
+                            @foreach ($this->fieldDefinitions as $fieldIndex => $field)
                                 @php
                                     $fieldKey = (string) ($field['key'] ?? '');
                                     $fieldType = (string) ($field['type'] ?? 'text');
@@ -606,7 +606,7 @@ new class extends Component {
                                     $fieldRequired = (bool) ($field['required'] ?? false);
                                 @endphp
 
-                                <div wire:key="landing-page-template-field-{{ $fieldKey }}">
+                                <div wire:key="landing-page-template-{{ $selectedTemplateId ?? 'none' }}-field-{{ $fieldKey }}-{{ $fieldIndex }}">
                                     @if ($fieldType === 'textarea' || $fieldType === 'richtext')
                                         <flux:textarea
                                             wire:model="formData.{{ $fieldKey }}"
