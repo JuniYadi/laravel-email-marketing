@@ -134,6 +134,11 @@ class LandingPageTemplateRegistry
         }
 
         $normalizedFields = [];
+        $renderMode = (string) ($definition['render_mode'] ?? 'app');
+
+        if (! in_array($renderMode, ['app', 'standalone'], true)) {
+            throw new InvalidArgumentException('Template ['.$key.'] has invalid render_mode ['.$renderMode.']');
+        }
 
         foreach ($fields as $field) {
             if (! is_array($field)) {
@@ -216,6 +221,9 @@ class LandingPageTemplateRegistry
             'view_path' => 'landing-page-templates.'.$key.'.view',
             'schema' => [
                 'fields' => $normalizedFields,
+                'meta' => [
+                    'render_mode' => $renderMode,
+                ],
             ],
             'preview_image_url' => isset($definition['preview_image_url'])
                 ? Str::of((string) $definition['preview_image_url'])->trim()->value()
