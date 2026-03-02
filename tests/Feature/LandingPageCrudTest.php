@@ -50,3 +50,17 @@ it('creates a draft landing page through the editor', function () {
     expect($landingPage?->status)->toBe(LandingPage::STATUS_DRAFT);
     expect($landingPage?->template_snapshot['key'])->toBe($template->key);
 });
+
+it('opens preview modal and switches preview viewport in landing page editor', function () {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test('pages::landing-pages.editor')
+        ->assertSet('showPreviewModal', false)
+        ->assertSet('previewViewport', 'desktop')
+        ->call('openPreviewModal')
+        ->assertSet('showPreviewModal', true)
+        ->call('setPreviewViewport', 'mobile')
+        ->assertSet('previewViewport', 'mobile')
+        ->call('setPreviewViewport', 'invalid')
+        ->assertSet('previewViewport', 'mobile');
+});
