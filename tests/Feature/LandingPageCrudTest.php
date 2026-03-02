@@ -51,6 +51,37 @@ it('creates a draft landing page through the editor', function () {
     expect($landingPage?->template_snapshot['key'])->toBe($template->key);
 });
 
+it('persists headline highlight and cta url as separate template fields', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => 'template-event-test',
+        'schema' => [
+            'fields' => [
+                ['key' => 'headline_highlight', 'label' => 'Headline Highlight', 'type' => 'text', 'required' => true, 'default' => 'Sales & Innovation'],
+                ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true, 'default' => 'https://example.com/default'],
+            ],
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.editor')
+        ->set('selectedTemplateId', $template->id)
+        ->set('title', 'Event Launch')
+        ->set('slug', 'event-launch')
+        ->set('meta.title', 'Event Launch Meta')
+        ->set('formData.headline_highlight', 'Independent Highlight Value')
+        ->set('formData.cta_url', 'https://example.com/register-now')
+        ->call('saveDraft')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('landing-pages.index'));
+
+    $landingPage = LandingPage::query()->where('slug', 'event-launch')->firstOrFail();
+
+    expect(data_get($landingPage->form_data, 'headline_highlight'))->toBe('Independent Highlight Value');
+    expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/register-now');
+});
+
 it('opens preview modal and switches preview viewport in landing page editor', function () {
     $this->actingAs(User::factory()->create());
 
