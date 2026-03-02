@@ -606,48 +606,50 @@ new class extends Component {
                                     $fieldRequired = (bool) ($field['required'] ?? false);
                                 @endphp
 
-                                @if ($fieldType === 'textarea' || $fieldType === 'richtext')
-                                    <flux:textarea
-                                        wire:model="formData.{{ $fieldKey }}"
-                                        :label="$fieldLabel"
-                                        rows="{{ $fieldType === 'richtext' ? 6 : 4 }}"
-                                        :required="$fieldRequired"
-                                    />
-                                @elseif ($fieldType === 'color')
-                                    <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="color" :required="$fieldRequired" />
-                                @elseif ($fieldType === 'image_url' || $fieldType === 'url')
-                                    <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="url" :required="$fieldRequired" />
-                                @elseif ($fieldType === 'number')
-                                    <flux:input
-                                        wire:model="formData.{{ $fieldKey }}"
-                                        :label="$fieldLabel"
-                                        type="number"
-                                        :min="isset($field['min']) ? (string) $field['min'] : null"
-                                        :max="isset($field['max']) ? (string) $field['max'] : null"
-                                        :required="$fieldRequired"
-                                    />
-                                @elseif ($fieldType === 'select')
-                                    <flux:field>
-                                        <flux:label>{{ $fieldLabel }}</flux:label>
-                                        <flux:select wire:model="formData.{{ $fieldKey }}" :required="$fieldRequired">
-                                            <flux:select.option value="">{{ __('Choose option') }}</flux:select.option>
-                                            @foreach ((array) ($field['options'] ?? []) as $option)
-                                                <flux:select.option value="{{ is_array($option) ? ($option['value'] ?? '') : $option }}">
-                                                    {{ is_array($option) ? ($option['label'] ?? $option['value'] ?? '') : $option }}
-                                                </flux:select.option>
-                                            @endforeach
-                                        </flux:select>
-                                    </flux:field>
-                                @elseif ($fieldType === 'toggle')
-                                    <flux:field>
-                                        <flux:label>{{ $fieldLabel }}</flux:label>
-                                        <flux:switch wire:model="formData.{{ $fieldKey }}" />
-                                    </flux:field>
-                                @else
-                                    <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="text" :required="$fieldRequired" />
-                                @endif
+                                <div wire:key="landing-page-template-field-{{ $fieldKey }}">
+                                    @if ($fieldType === 'textarea' || $fieldType === 'richtext')
+                                        <flux:textarea
+                                            wire:model="formData.{{ $fieldKey }}"
+                                            :label="$fieldLabel"
+                                            rows="{{ $fieldType === 'richtext' ? 6 : 4 }}"
+                                            :required="$fieldRequired"
+                                        />
+                                    @elseif ($fieldType === 'color')
+                                        <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="color" :required="$fieldRequired" />
+                                    @elseif ($fieldType === 'image_url' || $fieldType === 'url')
+                                        <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="url" :required="$fieldRequired" />
+                                    @elseif ($fieldType === 'number')
+                                        <flux:input
+                                            wire:model="formData.{{ $fieldKey }}"
+                                            :label="$fieldLabel"
+                                            type="number"
+                                            :min="isset($field['min']) ? (string) $field['min'] : null"
+                                            :max="isset($field['max']) ? (string) $field['max'] : null"
+                                            :required="$fieldRequired"
+                                        />
+                                    @elseif ($fieldType === 'select')
+                                        <flux:field>
+                                            <flux:label>{{ $fieldLabel }}</flux:label>
+                                            <flux:select wire:model="formData.{{ $fieldKey }}" :required="$fieldRequired">
+                                                <flux:select.option value="">{{ __('Choose option') }}</flux:select.option>
+                                                @foreach ((array) ($field['options'] ?? []) as $option)
+                                                    <flux:select.option value="{{ is_array($option) ? ($option['value'] ?? '') : $option }}">
+                                                        {{ is_array($option) ? ($option['label'] ?? $option['value'] ?? '') : $option }}
+                                                    </flux:select.option>
+                                                @endforeach
+                                            </flux:select>
+                                        </flux:field>
+                                    @elseif ($fieldType === 'toggle')
+                                        <flux:field>
+                                            <flux:label>{{ $fieldLabel }}</flux:label>
+                                            <flux:switch wire:model="formData.{{ $fieldKey }}" />
+                                        </flux:field>
+                                    @else
+                                        <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="text" :required="$fieldRequired" />
+                                    @endif
 
-                                <flux:error name="formData.{{ $fieldKey }}" />
+                                    <flux:error name="formData.{{ $fieldKey }}" />
+                                </div>
                             @endforeach
                         </div>
                     @endif
