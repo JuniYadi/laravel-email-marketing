@@ -17,9 +17,17 @@
             <meta name="robots" content="noindex, nofollow" />
         @endif
 
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @unless ($isStandaloneTemplate ?? false)
+            @vite('resources/css/app.css')
+        @endunless
+
+        @if ($isStandaloneTemplate ?? false)
+            <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        @endif
     </head>
-    <body class="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-900 dark:text-zinc-100">
+    <body @class([
+        'min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-900 dark:text-zinc-100' => ! ($isStandaloneTemplate ?? false),
+    ])>
         {!! $html !!}
     </body>
 </html>
