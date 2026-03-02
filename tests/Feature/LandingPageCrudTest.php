@@ -82,6 +82,47 @@ it('persists headline highlight and cta url as separate template fields', functi
     expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/register-now');
 });
 
+it('keeps template fields independent after switching templates in create flow', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $basicTemplate = LandingPageTemplate::factory()->create([
+        'schema' => [
+            'fields' => [
+                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true, 'default' => 'Hello'],
+                ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true, 'default' => 'https://example.com/basic'],
+            ],
+        ],
+    ]);
+
+    $eventTemplate = LandingPageTemplate::factory()->create([
+        'schema' => [
+            'fields' => [
+                ['key' => 'headline_highlight', 'label' => 'Headline Highlight', 'type' => 'text', 'required' => true, 'default' => 'Sales & Innovation'],
+                ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true, 'default' => 'https://example.com/event'],
+            ],
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.editor')
+        ->set('selectedTemplateId', $basicTemplate->id)
+        ->set('formData.cta_url', 'https://example.com/from-basic')
+        ->set('selectedTemplateId', $eventTemplate->id)
+        ->set('title', 'Switch Template Event')
+        ->set('slug', 'switch-template-event')
+        ->set('meta.title', 'Switch Template Event Meta')
+        ->set('formData.headline_highlight', 'Create Flow Highlight')
+        ->set('formData.cta_url', 'https://example.com/create-flow-cta')
+        ->call('saveDraft')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('landing-pages.index'));
+
+    $landingPage = LandingPage::query()->where('slug', 'switch-template-event')->firstOrFail();
+
+    expect(data_get($landingPage->form_data, 'headline_highlight'))->toBe('Create Flow Highlight');
+    expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/create-flow-cta');
+});
+
 it('opens preview modal and switches preview viewport in landing page editor', function () {
     $this->actingAs(User::factory()->create());
 
