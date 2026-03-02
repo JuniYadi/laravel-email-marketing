@@ -32,31 +32,35 @@ class LandingPageTemplateRegistry
     {
         $definitions = $this->definitions();
         $activeKeys = [];
+        $deactivated = 0;
+        $connection = LandingPageTemplate::query()->getConnection();
 
-        foreach ($definitions as $definition) {
-            LandingPageTemplate::query()->updateOrCreate(
-                ['key' => $definition['key']],
-                [
-                    'name' => $definition['name'],
-                    'description' => $definition['description'],
-                    'view_path' => $definition['view_path'],
-                    'schema' => $definition['schema'],
-                    'preview_image_url' => $definition['preview_image_url'],
-                    'is_active' => true,
-                    'version' => $definition['version'],
-                ],
-            );
+        $connection->transaction(function () use ($definitions, &$activeKeys, &$deactivated): void {
+            foreach ($definitions as $definition) {
+                LandingPageTemplate::query()->updateOrCreate(
+                    ['key' => $definition['key']],
+                    [
+                        'name' => $definition['name'],
+                        'description' => $definition['description'],
+                        'view_path' => $definition['view_path'],
+                        'schema' => $definition['schema'],
+                        'preview_image_url' => $definition['preview_image_url'],
+                        'is_active' => true,
+                        'version' => $definition['version'],
+                    ],
+                );
 
-            $activeKeys[] = $definition['key'];
-        }
+                $activeKeys[] = $definition['key'];
+            }
 
-        $deactivationQuery = LandingPageTemplate::query()->where('is_active', true);
+            $deactivationQuery = LandingPageTemplate::query()->where('is_active', true);
 
-        if ($activeKeys !== []) {
-            $deactivationQuery->whereNotIn('key', $activeKeys);
-        }
+            if ($activeKeys !== []) {
+                $deactivationQuery->whereNotIn('key', $activeKeys);
+            }
 
-        $deactivated = $deactivationQuery->update(['is_active' => false]);
+            $deactivated = $deactivationQuery->update(['is_active' => false]);
+        });
 
         return [
             'synced' => count($activeKeys),
@@ -134,6 +138,11 @@ class LandingPageTemplateRegistry
         }
 
         $normalizedFields = [];
+        $renderMode = (string) ($definition['render_mode'] ?? 'app');
+
+        if (! in_array($renderMode, ['app', 'standalone'], true)) {
+            throw new InvalidArgumentException('Template ['.$key.'] has invalid render_mode ['.$renderMode.']');
+        }
 
         foreach ($fields as $field) {
             if (! is_array($field)) {
@@ -216,6 +225,9 @@ class LandingPageTemplateRegistry
             'view_path' => 'landing-page-templates.'.$key.'.view',
             'schema' => [
                 'fields' => $normalizedFields,
+                'meta' => [
+                    'render_mode' => $renderMode,
+                ],
             ],
             'preview_image_url' => isset($definition['preview_image_url'])
                 ? Str::of((string) $definition['preview_image_url'])->trim()->value()

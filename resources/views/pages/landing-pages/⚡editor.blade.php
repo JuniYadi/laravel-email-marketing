@@ -4,6 +4,7 @@ use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Support\LandingPages\LandingPageRenderer;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -23,6 +24,10 @@ new class extends Component {
     public bool $slugManuallyEdited = false;
 
     public string $status = LandingPage::STATUS_DRAFT;
+
+    public bool $showPreviewModal = false;
+
+    public string $previewViewport = 'desktop';
 
     /**
      * @var array<string, mixed>
@@ -123,6 +128,20 @@ new class extends Component {
         $this->persist(LandingPage::STATUS_PUBLISHED);
     }
 
+    public function openPreviewModal(): void
+    {
+        $this->showPreviewModal = true;
+    }
+
+    public function setPreviewViewport(string $viewport): void
+    {
+        if (! in_array($viewport, ['desktop', 'mobile'], true)) {
+            return;
+        }
+
+        $this->previewViewport = $viewport;
+    }
+
     #[Computed]
     public function templates(): Collection
     {
@@ -159,6 +178,36 @@ new class extends Component {
         } catch (\Throwable) {
             return '<div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">Preview unavailable due to invalid template metadata.</div>';
         }
+    }
+
+    #[Computed]
+    public function previewDocument(): string
+    {
+        $head = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+
+        if (! $this->isStandaloneTemplate()) {
+            $head .= '<link rel="stylesheet" href="'.e(Vite::asset('resources/css/app.css')).'">';
+        } else {
+            $head .= '<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>';
+        }
+
+        return '<!doctype html><html><head>'.$head.'</head><body style="margin:0;">'
+            .$this->previewHtml
+            .'</body></html>';
+    }
+
+    protected function isStandaloneTemplate(): bool
+    {
+        $renderMode = (string) data_get($this->templateSnapshot, 'schema.meta.render_mode', '');
+
+        if ($renderMode === '' && $this->selectedTemplateId !== null) {
+            $template = $this->templates->firstWhere('id', (int) $this->selectedTemplateId);
+            $renderMode = $template instanceof LandingPageTemplate
+                ? (string) data_get($template->schema, 'meta.render_mode', 'app')
+                : 'app';
+        }
+
+        return $renderMode === 'standalone';
     }
 
     /**
@@ -489,13 +538,18 @@ new class extends Component {
                 <flux:text class="mt-2">{{ __('Choose a design, fill schema-driven fields, and publish to a reusable event URL.') }}</flux:text>
             </div>
 
-            <flux:button :href="route('landing-pages.index')" variant="ghost" wire:navigate>
-                {{ __('Back to Landing Pages') }}
-            </flux:button>
+            <div class="flex items-center gap-2">
+                <flux:button type="button" variant="ghost" wire:click="openPreviewModal">
+                    {{ __('Open Preview') }}
+                </flux:button>
+
+                <flux:button :href="route('landing-pages.index')" variant="ghost" wire:navigate>
+                    {{ __('Back to Landing Pages') }}
+                </flux:button>
+            </div>
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[420px_1fr]">
-            <div class="space-y-5 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="space-y-5 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
                 <flux:field>
                     <flux:label>{{ __('Template') }}</flux:label>
                     <flux:select wire:model.live="selectedTemplateId" :disabled="$landingPageId !== null" required>
@@ -600,6 +654,9 @@ new class extends Component {
                 </div>
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
+                    <flux:button type="button" variant="ghost" wire:click="openPreviewModal">
+                        {{ __('Open Preview') }}
+                    </flux:button>
                     <flux:button type="button" variant="ghost" wire:click="saveDraft">
                         {{ __('Save Draft') }}
                     </flux:button>
@@ -607,16 +664,55 @@ new class extends Component {
                         {{ __('Publish') }}
                     </flux:button>
                 </div>
-            </div>
-
-            <div class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
-                <flux:heading size="lg">{{ __('Live Preview') }}</flux:heading>
-                <flux:text class="mt-2 text-sm">{{ __('Rendering from template snapshot + current form data.') }}</flux:text>
-
-                <div class="mt-4 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
-                    {!! $this->previewHtml !!}
-                </div>
-            </div>
         </div>
     </div>
+
+    <flux:modal wire:model="showPreviewModal" class="max-w-[98vw]">
+        <div class="space-y-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <flux:heading>{{ __('Landing Page Preview') }}</flux:heading>
+                    <flux:text class="mt-1 text-sm">{{ __('Rendering from template snapshot + current form data at fixed viewport width.') }}</flux:text>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <flux:button
+                        type="button"
+                        size="sm"
+                        :variant="$previewViewport === 'desktop' ? 'primary' : 'ghost'"
+                        wire:click="setPreviewViewport('desktop')"
+                    >
+                        {{ __('Desktop') }}
+                    </flux:button>
+                    <flux:button
+                        type="button"
+                        size="sm"
+                        :variant="$previewViewport === 'mobile' ? 'primary' : 'ghost'"
+                        wire:click="setPreviewViewport('mobile')"
+                    >
+                        {{ __('Mobile') }}
+                    </flux:button>
+                </div>
+            </div>
+
+            <div class="overflow-auto rounded-xl border border-zinc-200 bg-zinc-100 p-4 dark:border-zinc-700 dark:bg-zinc-950">
+                @php
+                    $previewCanvasClass = $previewViewport === 'mobile'
+                        ? 'mx-auto h-[844px] w-[390px] max-w-[390px] overflow-hidden rounded-lg bg-white shadow-sm'
+                        : 'h-[860px] w-[1440px] min-w-[1440px] overflow-hidden rounded-lg bg-white shadow-sm';
+                @endphp
+                <iframe
+                    title="{{ __('Landing Page Preview') }}"
+                    class="{{ $previewCanvasClass }}"
+                    srcdoc="{{ $this->previewDocument }}"
+                ></iframe>
+            </div>
+
+            <div class="flex items-center justify-end">
+                <flux:button type="button" variant="ghost" wire:click="$set('showPreviewModal', false)">
+                    {{ __('Close') }}
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </section>
