@@ -2,6 +2,7 @@
 
 use App\Models\Contact;
 use App\Models\ContactGroup;
+use App\Support\Contacts\ContactVariableRegistry;
 use App\Support\CsvUploadedFileReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
@@ -231,15 +232,17 @@ new class extends Component
                 continue;
             }
 
-            $contact = Contact::query()->updateOrCreate(
-                ['email' => $email],
-                [
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'company' => $this->nullableTrim($rowData['company'] ?? null),
-                    'is_invalid' => $this->toBoolean($rowData['isinvalid'] ?? null),
-                ],
-            );
+            $customFields = $this->extractCustomFields($headers, $row);
+            $contact = Contact::query()->firstOrNew(['email' => $email]);
+            $existingCustomFields = is_array($contact->custom_fields) ? $contact->custom_fields : [];
+
+            $contact->email = $email;
+            $contact->first_name = $firstName;
+            $contact->last_name = $lastName;
+            $contact->company = $this->nullableTrim($rowData['company'] ?? null);
+            $contact->is_invalid = $this->toBoolean($rowData['isinvalid'] ?? null);
+            $contact->custom_fields = $this->mergeCustomFields($existingCustomFields, $customFields);
+            $contact->save();
 
             $csvGroupIds = $this->extractCsvGroupIds($rowData);
             $groupIds = collect($validated['selectedGroupIds'])
@@ -355,13 +358,55 @@ new class extends Component
     }
 
     /**
+     * @param  list<string>  $headers
+     * @param  list<string>  $row
+     * @return array<string, string>
+     */
+    protected function extractCustomFields(array $headers, array $row): array
+    {
+        $reservedKeys = ContactVariableRegistry::reservedCustomFieldKeys();
+        $customFields = [];
+
+        foreach ($headers as $index => $header) {
+            $normalizedKey = ContactVariableRegistry::normalizeCustomFieldKey($header);
+
+            if ($normalizedKey === '' || in_array($normalizedKey, $reservedKeys, true)) {
+                continue;
+            }
+
+            $customFields[$normalizedKey] = trim((string) ($row[$index] ?? ''));
+        }
+
+        return $customFields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $existingCustomFields
+     * @param  array<string, string>  $incomingCustomFields
+     * @return array<string, mixed>
+     */
+    protected function mergeCustomFields(array $existingCustomFields, array $incomingCustomFields): array
+    {
+        foreach ($incomingCustomFields as $key => $value) {
+            if (trim($value) === '') {
+                continue;
+            }
+
+            $existingCustomFields[$key] = $value;
+        }
+
+        return $existingCustomFields;
+    }
+
+    /**
      * Export all contacts with assigned groups to CSV.
      */
     public function exportContactsCsv(): StreamedResponse
     {
         $filename = sprintf('contacts-%s.csv', now()->format('Ymd_His'));
+        $customFieldHeaders = ContactVariableRegistry::discoveredCustomFieldKeys();
 
-        return response()->streamDownload(function (): void {
+        return response()->streamDownload(function () use ($customFieldHeaders): void {
             $handle = fopen('php://output', 'w');
 
             if ($handle === false) {
@@ -378,13 +423,23 @@ new class extends Component
                 'group_ids',
                 'group_names',
                 'created_at',
+                ...$customFieldHeaders,
             ], ',', '"', '');
 
             Contact::query()
                 ->with('groups:id,name')
                 ->orderBy('id')
-                ->chunkById(500, function (Collection $contacts) use ($handle): void {
+                ->chunkById(500, function (Collection $contacts) use ($handle, $customFieldHeaders): void {
                     foreach ($contacts as $contact) {
+                        $customFieldValues = collect($customFieldHeaders)
+                            ->map(function (string $key) use ($contact): string {
+                                $customFields = is_array($contact->custom_fields) ? $contact->custom_fields : [];
+                                $value = $customFields[$key] ?? '';
+
+                                return is_scalar($value) ? (string) $value : '';
+                            })
+                            ->all();
+
                         fputcsv($handle, [
                             $contact->id,
                             $contact->email,
@@ -395,6 +450,7 @@ new class extends Component
                             $contact->groups->pluck('id')->implode('|'),
                             $contact->groups->pluck('name')->implode('|'),
                             $contact->created_at?->format('Y-m-d H:i:s'),
+                            ...$customFieldValues,
                         ], ',', '"', '');
                     }
                 });

@@ -2,6 +2,7 @@
 
 use App\Mail\TemplateTestMail;
 use App\Models\EmailTemplate;
+use App\Support\Contacts\ContactVariableRegistry;
 use App\Support\TemplateRenderer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Mail;
@@ -55,14 +56,7 @@ new class extends Component {
      */
     protected function renderContent(string $content): string
     {
-        return app(TemplateRenderer::class)->render($content, [
-            'first_name' => 'Jane',
-            'last_name' => 'Doe',
-            'full_name' => 'Jane Doe',
-            'email' => 'jane@example.com',
-            'company' => 'Acme',
-            'unsubscribe_url' => 'https://example.com/unsubscribe',
-        ]);
+        return app(TemplateRenderer::class)->render($content, ContactVariableRegistry::previewVariables());
     }
 
     #[Computed]
