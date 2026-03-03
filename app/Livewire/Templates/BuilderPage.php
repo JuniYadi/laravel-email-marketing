@@ -557,6 +557,30 @@ class BuilderPage extends Component
     }
 
     /**
+     * Generate a complete HTML document for iframe preview.
+     * This isolates the raw HTML template styles from the application layout.
+     */
+    public function previewDocument(): string
+    {
+        $head = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+
+        // For RAW HTML templates, we don't include app styles to avoid conflicts
+        // The raw HTML should contain its own styling
+
+        return '<!doctype html><html><head>'.$head.'</head><body style="margin:0;padding:0;">'
+            .$this->previewHtml()
+            .'</body></html>';
+    }
+
+    /**
+     * Check if the current template is in raw HTML mode.
+     */
+    public function isRawMode(): bool
+    {
+        return $this->mode === 'raw';
+    }
+
+    /**
      * @return array{schema_version: int, meta: array<string, string>, theme: array<string, string|int>, rows: array<int, array<string, mixed>>}
      */
     protected function currentSchema(): array
