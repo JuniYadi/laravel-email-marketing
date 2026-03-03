@@ -136,3 +136,74 @@ it('opens preview modal and switches preview viewport in landing page editor', f
         ->call('setPreviewViewport', 'invalid')
         ->assertSet('previewViewport', 'mobile');
 });
+
+it('shows landing pages from all users in index', function () {
+    $viewer = User::factory()->create();
+    $ownerA = User::factory()->create(['name' => 'Owner A']);
+    $ownerB = User::factory()->create(['name' => 'Owner B']);
+
+    LandingPage::factory()->create([
+        'user_id' => $ownerA->id,
+        'title' => 'Owner A Page',
+        'slug' => 'owner-a-page',
+    ]);
+
+    LandingPage::factory()->create([
+        'user_id' => $ownerB->id,
+        'title' => 'Owner B Page',
+        'slug' => 'owner-b-page',
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('landing-pages.index'))
+        ->assertOk()
+        ->assertSeeText('Owner A Page')
+        ->assertSeeText('Owner B Page')
+        ->assertSeeText('Owner A')
+        ->assertSeeText('Owner B');
+});
+
+it('allows editing landing pages created by another user', function () {
+    $editor = User::factory()->create();
+    $owner = User::factory()->create();
+    $template = LandingPageTemplate::factory()->create();
+    $landingPage = LandingPage::factory()->create([
+        'user_id' => $owner->id,
+        'landing_page_template_id' => $template->id,
+        'title' => 'Shared Page',
+        'slug' => 'shared-page',
+        'template_snapshot' => [
+            'key' => $template->key,
+            'name' => $template->name,
+            'description' => $template->description,
+            'view_path' => $template->view_path,
+            'version' => $template->version,
+            'schema' => is_array($template->schema) ? $template->schema : ['fields' => []],
+        ],
+    ]);
+
+    $this->actingAs($editor);
+
+    $this->get(route('landing-pages.edit', $landingPage))
+        ->assertOk();
+
+    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id])
+        ->set('title', 'Shared Page Updated')
+        ->set('meta.title', 'Shared Page Updated Meta')
+        ->call('saveDraft')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('landing-pages.index'));
+
+    expect($landingPage->fresh()->title)->toBe('Shared Page Updated');
+});
+
+it('allows only the owner to delete a landing page', function () {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $landingPage = LandingPage::factory()->create([
+        'user_id' => $owner->id,
+    ]);
+
+    expect($owner->can('delete', $landingPage))->toBeTrue();
+    expect($otherUser->can('delete', $landingPage))->toBeFalse();
+});
