@@ -253,3 +253,38 @@ it('handles multiple attachments from snapshot', function () {
             && $mail->attachmentData === $snapshotAttachments;
     });
 });
+
+it('renders custom contact fields and unsubscribe url placeholders', function () {
+    $template = EmailTemplate::factory()->create();
+
+    $broadcast = Broadcast::factory()->create([
+        'email_template_id' => $template->id,
+        'status' => Broadcast::STATUS_RUNNING,
+        'snapshot_subject' => 'Voucher {{ voucher_code }}',
+        'snapshot_html_content' => '<p>{{ voucher_code }}</p><a href="{{ unsubscribe_url }}">Unsubscribe</a>',
+        'snapshot_builder_schema' => [],
+        'from_email' => 'test@example.com',
+    ]);
+
+    $contact = Contact::factory()->create([
+        'custom_fields' => [
+            'voucher_code' => 'ABC123',
+        ],
+    ]);
+
+    $recipient = BroadcastRecipient::factory()->create([
+        'broadcast_id' => $broadcast->id,
+        'contact_id' => $contact->id,
+        'email' => $contact->email,
+        'status' => BroadcastRecipient::STATUS_QUEUED,
+    ]);
+
+    $job = new SendBroadcastRecipientMail($recipient->id);
+    $job->handle(app(\App\Support\TemplateRenderer::class));
+
+    Mail::assertSent(BroadcastRecipientMail::class, function ($mail) {
+        return $mail->subjectLine === 'Voucher ABC123'
+            && str_contains($mail->htmlContent, '<p>ABC123</p>')
+            && str_contains($mail->htmlContent, 'signature=');
+    });
+});

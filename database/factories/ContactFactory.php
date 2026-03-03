@@ -28,6 +28,7 @@ class ContactFactory extends Factory
             'last_name' => $lastName,
             'company' => fake()->optional()->company(),
             'is_invalid' => false,
+            'custom_fields' => [],
         ];
     }
 }

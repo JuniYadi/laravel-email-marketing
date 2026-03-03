@@ -62,22 +62,24 @@ class SendBroadcastRecipientMail implements ShouldQueue
 
         $contact = $recipient->contact;
 
-        $variables = [
-            'first_name' => $contact?->first_name,
-            'last_name' => $contact?->last_name,
-            'full_name' => $contact?->full_name,
-            'email' => $recipient->email,
-            'company' => $contact?->company,
-        ];
-
-        $subject = $renderer->render((string) $broadcast->snapshot_subject, $variables);
-        $htmlContent = $renderer->render((string) $broadcast->snapshot_html_content, $variables);
-
         $unsubscribeUrl = URL::signedRoute(
             'unsubscribe',
             ['contact' => $recipient->contact_id],
             now()->addDays(30)
         );
+
+        $variables = [
+            ...$this->extractCustomTemplateVariables($contact?->custom_fields),
+            'first_name' => $contact?->first_name,
+            'last_name' => $contact?->last_name,
+            'full_name' => $contact?->full_name,
+            'email' => $recipient->email,
+            'company' => $contact?->company,
+            'unsubscribe_url' => $unsubscribeUrl,
+        ];
+
+        $subject = $renderer->render((string) $broadcast->snapshot_subject, $variables);
+        $htmlContent = $renderer->render((string) $broadcast->snapshot_html_content, $variables);
 
         // Get attachments from broadcast snapshot or fall back to email template
         $attachments = $broadcast->snapshot_builder_schema['attachments'] ?? $broadcast->template?->attachments ?? [];
@@ -180,5 +182,31 @@ class SendBroadcastRecipientMail implements ShouldQueue
             ],
             'occurred_at' => now(),
         ]);
+    }
+
+    /**
+     * @return array<string, scalar|null>
+     */
+    protected function extractCustomTemplateVariables(mixed $customFields): array
+    {
+        if (! is_array($customFields)) {
+            return [];
+        }
+
+        $variables = [];
+
+        foreach ($customFields as $key => $value) {
+            if (! is_string($key) || $key === '') {
+                continue;
+            }
+
+            if (! is_scalar($value) && $value !== null) {
+                continue;
+            }
+
+            $variables[$key] = $value;
+        }
+
+        return $variables;
     }
 }

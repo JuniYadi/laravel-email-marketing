@@ -25,6 +25,7 @@ class Contact extends Model
         'last_name',
         'company',
         'is_invalid',
+        'custom_fields',
         'unsubscribed_at',
     ];
 
@@ -44,6 +45,7 @@ class Contact extends Model
     {
         return [
             'is_invalid' => 'boolean',
+            'custom_fields' => 'array',
             'unsubscribed_at' => 'datetime',
         ];
     }
