@@ -293,9 +293,20 @@
                                     <flux:text class="font-medium">{{ __('Subject') }}: {{ $this->previewSubject() }}</flux:text>
                                 </div>
 
-                                <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                                    {!! $this->previewHtml() !!}
-                                </div>
+                                @if ($this->isRawMode())
+                                    {{-- Use iframe for RAW HTML templates to isolate styles --}}
+                                    <div class="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
+                                        <iframe
+                                            title="{{ __('Email Preview') }}"
+                                            srcdoc="{{ $this->previewDocument() }}"
+                                            class="w-full min-h-[500px] border-0"
+                                        ></iframe>
+                                    </div>
+                                @else
+                                    <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                                        {!! $this->previewHtml() !!}
+                                    </div>
+                                @endif
                             </div>
                         @endif
 
