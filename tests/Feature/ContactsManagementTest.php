@@ -86,6 +86,54 @@ it('uses fullName when first and last names are missing in csv', function () {
         ->and($contact->full_name)->toBe('Sam Carter');
 });
 
+it('imports normalized custom fields from csv', function () {
+    $this->actingAs(User::factory()->create());
+
+    $csv = "email,firstName,lastName,Voucher Code,Loyalty-Tier\n";
+    $csv .= "sam@example.com,Sam,Carter,ABC123,Gold\n";
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', $csv);
+
+    Livewire::test('pages::contacts.index')
+        ->set('csvFile', $file)
+        ->call('importContacts')
+        ->assertHasNoErrors();
+
+    $contact = Contact::query()->where('email', 'sam@example.com')->firstOrFail();
+
+    expect($contact->custom_fields)->toBe([
+        'voucher_code' => 'ABC123',
+        'loyalty_tier' => 'Gold',
+    ]);
+});
+
+it('keeps existing custom field values when re-import csv has blank value', function () {
+    $this->actingAs(User::factory()->create());
+
+    $initialCsv = "email,firstName,lastName,Voucher Code\n";
+    $initialCsv .= "jane@example.com,Jane,Doe,ABC123\n";
+
+    Livewire::test('pages::contacts.index')
+        ->set('csvFile', UploadedFile::fake()->createWithContent('contacts.csv', $initialCsv))
+        ->call('importContacts')
+        ->assertHasNoErrors();
+
+    $secondCsv = "email,firstName,lastName,Voucher Code,Loyalty Tier\n";
+    $secondCsv .= "jane@example.com,Jane,Doe,,Platinum\n";
+
+    Livewire::test('pages::contacts.index')
+        ->set('csvFile', UploadedFile::fake()->createWithContent('contacts.csv', $secondCsv))
+        ->call('importContacts')
+        ->assertHasNoErrors();
+
+    $contact = Contact::query()->where('email', 'jane@example.com')->firstOrFail();
+
+    expect($contact->custom_fields)->toBe([
+        'voucher_code' => 'ABC123',
+        'loyalty_tier' => 'Platinum',
+    ]);
+});
+
 it('downloads contacts and groups csv from contacts page', function () {
     $this->actingAs(User::factory()->create());
 
@@ -99,6 +147,40 @@ it('downloads contacts and groups csv from contacts page', function () {
     Livewire::test('pages::contacts.index')
         ->call('exportGroupsCsv')
         ->assertFileDownloaded();
+});
+
+it('includes discovered custom fields in exported contacts csv', function () {
+    $this->actingAs(User::factory()->create());
+
+    Contact::factory()->create([
+        'email' => 'a@example.com',
+        'custom_fields' => [
+            'voucher_code' => 'AAA111',
+        ],
+    ]);
+
+    Contact::factory()->create([
+        'email' => 'b@example.com',
+        'custom_fields' => [
+            'loyalty_tier' => 'Gold',
+        ],
+    ]);
+
+    $testable = Livewire::test('pages::contacts.index')
+        ->call('exportContactsCsv')
+        ->assertFileDownloaded();
+
+    $response = $testable->instance()->exportContactsCsv();
+
+    ob_start();
+    $response->sendContent();
+    $csv = (string) ob_get_clean();
+
+    $lines = array_values(array_filter(explode("\n", trim($csv))));
+    $header = str_getcsv($lines[0]);
+
+    expect($header)->toContain('voucher_code')
+        ->and($header)->toContain('loyalty_tier');
 });
 
 it('downloads filtered group contacts as csv', function () {

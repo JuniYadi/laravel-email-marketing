@@ -2,6 +2,7 @@
 
 use App\Livewire\Templates\BuilderPage;
 use App\Mail\TemplateTestMail;
+use App\Models\Contact;
 use App\Models\EmailTemplate;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -184,6 +185,19 @@ it('normalizes invalid sidebar tab values back to layout', function () {
         ->set('currentStep', 2)
         ->set('sidebarTab', 'settings')
         ->assertSet('sidebarTab', 'layout');
+});
+
+it('includes discovered contact custom fields in available variables', function () {
+    $this->actingAs(User::factory()->create());
+
+    Contact::factory()->create([
+        'custom_fields' => [
+            'voucher_code' => 'ABC123',
+        ],
+    ]);
+
+    Livewire::test(BuilderPage::class)
+        ->assertSet('availableVariables', fn (array $variables): bool => in_array('voucher_code', $variables, true));
 });
 
 it('downloads templates as csv', function () {
