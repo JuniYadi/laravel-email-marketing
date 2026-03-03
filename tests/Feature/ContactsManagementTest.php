@@ -183,6 +183,40 @@ it('includes discovered custom fields in exported contacts csv', function () {
         ->and($header)->toContain('loyalty_tier');
 });
 
+it('downloads import sample csv with custom field examples', function () {
+    $this->actingAs(User::factory()->create());
+
+    $testable = Livewire::test('pages::contacts.index')
+        ->call('downloadImportSampleCsv')
+        ->assertFileDownloaded();
+
+    $response = $testable->instance()->downloadImportSampleCsv();
+
+    ob_start();
+    $response->sendContent();
+    $csv = (string) ob_get_clean();
+
+    $lines = array_values(array_filter(explode("\n", trim($csv))));
+    $header = str_getcsv($lines[0]);
+
+    expect($header)->toBe([
+        'email',
+        'firstName',
+        'lastName',
+        'company',
+        'isInvalid',
+        'groups',
+        'voucher_code',
+        'loyalty_tier',
+    ]);
+
+    $firstDataRow = str_getcsv($lines[1]);
+
+    expect($firstDataRow[0])->toBe('alice@example.com')
+        ->and($firstDataRow[6])->toBe('VC-1001')
+        ->and($firstDataRow[7])->toBe('Gold');
+});
+
 it('downloads filtered group contacts as csv', function () {
     $this->actingAs(User::factory()->create());
 
