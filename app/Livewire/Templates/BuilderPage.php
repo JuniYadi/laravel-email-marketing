@@ -3,6 +3,7 @@
 namespace App\Livewire\Templates;
 
 use App\Models\EmailTemplate;
+use App\Support\Contacts\ContactVariableRegistry;
 use App\Support\EmailTemplateBuilderRenderer;
 use App\Support\TemplateBuilder\CanvasStateManager;
 use App\Support\TemplateBuilder\HistoryManager;
@@ -134,6 +135,7 @@ class BuilderPage extends Component
     public function mount(EmailTemplate|int|string|null $template = null): void
     {
         $this->theme = $this->defaultTheme();
+        $this->availableVariables = ContactVariableRegistry::templateVariableKeys();
         $this->starterTemplateOptions = collect($this->starterTemplates())
             ->map(fn (array $item): string => $item['label'])
             ->all();
@@ -541,14 +543,7 @@ class BuilderPage extends Component
      */
     public function previewVariables(): array
     {
-        return [
-            'first_name' => 'Jane',
-            'last_name' => 'Doe',
-            'full_name' => 'Jane Doe',
-            'email' => 'jane@example.com',
-            'company' => 'Acme',
-            'unsubscribe_url' => 'https://example.com/unsubscribe',
-        ];
+        return ContactVariableRegistry::previewVariables();
     }
 
     public function previewSubject(): string
