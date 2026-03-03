@@ -502,6 +502,59 @@ new class extends Component
         ]);
     }
 
+    /**
+     * Download a sample CSV template for contact imports.
+     */
+    public function downloadImportSampleCsv(): StreamedResponse
+    {
+        $filename = sprintf('contacts-import-sample-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'email',
+                'firstName',
+                'lastName',
+                'company',
+                'isInvalid',
+                'groups',
+                'voucher_code',
+                'loyalty_tier',
+            ], ',', '"', '');
+
+            fputcsv($handle, [
+                'alice@example.com',
+                'Alice',
+                'Nguyen',
+                'Acme Inc',
+                'false',
+                '1,3',
+                'VC-1001',
+                'Gold',
+            ], ',', '"', '');
+
+            fputcsv($handle, [
+                'bob@example.com',
+                'Bob',
+                'Lee',
+                'Beta LLC',
+                'false',
+                '2',
+                'VC-1002',
+                'Silver',
+            ], ',', '"', '');
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     #[Computed]
     public function groups(): Collection
     {
@@ -721,10 +774,29 @@ new class extends Component
     <flux:modal wire:model="showImportModal" class="max-w-2xl">
         <div class="space-y-4">
             <flux:heading>{{ __('Import CSV') }}</flux:heading>
-            <flux:text>{{ __('Headers: email, firstName, lastName, fullName, company, isInvalid, groups') }}</flux:text>
+            <flux:text>{{ __('Headers: email, firstName, lastName, fullName, company, isInvalid, groups, plus any custom columns (ex: voucher_code, loyalty_tier).') }}</flux:text>
+            <div>
+                <flux:button wire:click="downloadImportSampleCsv" variant="ghost" size="sm" icon="arrow-down-tray">
+                    {{ __('Download Sample CSV') }}
+                </flux:button>
+            </div>
 
             <form wire:submit="importContacts" class="space-y-4">
-                <flux:input wire:model="csvFile" type="file" :label="__('CSV File')" />
+                <div class="space-y-2">
+                    <label for="contacts-csv-file" class="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ __('CSV File') }}
+                    </label>
+                    <input
+                        id="contacts-csv-file"
+                        wire:model="csvFile"
+                        type="file"
+                        accept=".csv,.txt,text/csv,text/plain"
+                        class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-zinc-200 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:file:bg-zinc-800 dark:file:text-zinc-100 dark:hover:file:bg-zinc-700"
+                    />
+                    @error('csvFile')
+                        <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 @if ($this->groups->isNotEmpty())
                     <div class="space-y-2">
