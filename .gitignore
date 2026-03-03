@@ -27,3 +27,4 @@ docs/plans/
 .worktree/
 public/vendor/
 temp/
+.ralph/
