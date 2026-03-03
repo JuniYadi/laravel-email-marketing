@@ -502,6 +502,59 @@ new class extends Component
         ]);
     }
 
+    /**
+     * Download a sample CSV template for contact imports.
+     */
+    public function downloadImportSampleCsv(): StreamedResponse
+    {
+        $filename = sprintf('contacts-import-sample-%s.csv', now()->format('Ymd_His'));
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, [
+                'email',
+                'firstName',
+                'lastName',
+                'company',
+                'isInvalid',
+                'groups',
+                'voucher_code',
+                'loyalty_tier',
+            ], ',', '"', '');
+
+            fputcsv($handle, [
+                'alice@example.com',
+                'Alice',
+                'Nguyen',
+                'Acme Inc',
+                'false',
+                '1,3',
+                'VC-1001',
+                'Gold',
+            ], ',', '"', '');
+
+            fputcsv($handle, [
+                'bob@example.com',
+                'Bob',
+                'Lee',
+                'Beta LLC',
+                'false',
+                '2',
+                'VC-1002',
+                'Silver',
+            ], ',', '"', '');
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     #[Computed]
     public function groups(): Collection
     {
@@ -722,6 +775,11 @@ new class extends Component
         <div class="space-y-4">
             <flux:heading>{{ __('Import CSV') }}</flux:heading>
             <flux:text>{{ __('Headers: email, firstName, lastName, fullName, company, isInvalid, groups, plus any custom columns (ex: voucher_code, loyalty_tier).') }}</flux:text>
+            <div>
+                <flux:button wire:click="downloadImportSampleCsv" variant="ghost" size="sm" icon="arrow-down-tray">
+                    {{ __('Download Sample CSV') }}
+                </flux:button>
+            </div>
 
             <form wire:submit="importContacts" class="space-y-4">
                 <div class="space-y-2">
