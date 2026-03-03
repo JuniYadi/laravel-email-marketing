@@ -337,7 +337,6 @@ new class extends Component {
         } else {
             $landingPage = LandingPage::query()
                 ->where('id', $this->landingPageId)
-                ->where('user_id', auth()->id())
                 ->firstOrFail();
 
             if ($status === LandingPage::STATUS_PUBLISHED && $landingPage->published_at !== null) {
@@ -438,14 +437,12 @@ new class extends Component {
         if ($landingPage instanceof LandingPage) {
             return LandingPage::query()
                 ->where('id', $landingPage->id)
-                ->where('user_id', auth()->id())
                 ->firstOrFail();
         }
 
         if (is_numeric($landingPage)) {
             return LandingPage::query()
                 ->where('id', (int) $landingPage)
-                ->where('user_id', auth()->id())
                 ->firstOrFail();
         }
 
