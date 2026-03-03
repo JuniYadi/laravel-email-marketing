@@ -721,10 +721,24 @@ new class extends Component
     <flux:modal wire:model="showImportModal" class="max-w-2xl">
         <div class="space-y-4">
             <flux:heading>{{ __('Import CSV') }}</flux:heading>
-            <flux:text>{{ __('Headers: email, firstName, lastName, fullName, company, isInvalid, groups') }}</flux:text>
+            <flux:text>{{ __('Headers: email, firstName, lastName, fullName, company, isInvalid, groups, plus any custom columns (ex: voucher_code, loyalty_tier).') }}</flux:text>
 
             <form wire:submit="importContacts" class="space-y-4">
-                <flux:input wire:model="csvFile" type="file" :label="__('CSV File')" />
+                <div class="space-y-2">
+                    <label for="contacts-csv-file" class="block text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ __('CSV File') }}
+                    </label>
+                    <input
+                        id="contacts-csv-file"
+                        wire:model="csvFile"
+                        type="file"
+                        accept=".csv,.txt,text/csv,text/plain"
+                        class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-zinc-200 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:file:bg-zinc-800 dark:file:text-zinc-100 dark:hover:file:bg-zinc-700"
+                    />
+                    @error('csvFile')
+                        <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 @if ($this->groups->isNotEmpty())
                     <div class="space-y-2">
