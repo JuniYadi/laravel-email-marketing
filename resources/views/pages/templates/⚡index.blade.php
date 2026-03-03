@@ -17,6 +17,7 @@ new class extends Component {
     public string $previewHtml = '';
     public string $previewSubject = '';
     public string $testEmail = '';
+    public bool $isRawTemplate = false;
 
     /**
      * Open preview modal for selected template.
@@ -28,8 +29,24 @@ new class extends Component {
         $this->previewTemplateId = $template->id;
         $this->previewSubject = $this->renderContent($template->subject);
         $this->previewHtml = $this->renderContent($template->html_content);
+        $this->isRawTemplate = ! is_array($template->builder_schema);
         $this->testEmail = auth()->user()?->email ?? '';
         $this->showPreviewModal = true;
+    }
+
+    /**
+     * Generate a complete HTML document for iframe preview.
+     * This isolates the raw HTML template styles from the application layout.
+     */
+    public function previewDocument(): string
+    {
+        $head = '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+
+        // For RAW HTML templates, we don't include app styles to avoid conflicts
+
+        return '<!doctype html><html><head>'.$head.'</head><body style="margin:0;padding:0;">'
+            .$this->previewHtml
+            .'</body></html>';
     }
 
     /**
@@ -196,9 +213,20 @@ new class extends Component {
                 <flux:text class="font-medium">{{ __('Subject') }}: {{ $previewSubject }}</flux:text>
             </div>
 
-            <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                {!! $previewHtml !!}
-            </div>
+            @if ($isRawTemplate)
+                {{-- Use iframe for RAW HTML templates to isolate styles --}}
+                <div class="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-700">
+                    <iframe
+                        title="{{ __('Email Preview') }}"
+                        srcdoc="{{ $this->previewDocument() }}"
+                        class="w-full min-h-[500px] border-0"
+                    ></iframe>
+                </div>
+            @else
+                <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                    {!! $previewHtml !!}
+                </div>
+            @endif
 
             @if ($previewTemplateId)
                 <form wire:submit="sendTestEmail({{ $previewTemplateId }})" class="space-y-3">
