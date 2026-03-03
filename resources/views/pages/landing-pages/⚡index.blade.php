@@ -9,7 +9,6 @@ new class extends Component {
     public function publishPage(int $landingPageId): void
     {
         $landingPage = LandingPage::query()
-            ->where('user_id', auth()->id())
             ->findOrFail($landingPageId);
 
         $landingPage->update([
@@ -21,7 +20,6 @@ new class extends Component {
     public function unpublishPage(int $landingPageId): void
     {
         $landingPage = LandingPage::query()
-            ->where('user_id', auth()->id())
             ->findOrFail($landingPageId);
 
         $landingPage->update([
@@ -34,7 +32,7 @@ new class extends Component {
     public function landingPages(): Collection
     {
         return LandingPage::query()
-            ->where('user_id', auth()->id())
+            ->with('user:id,name,email')
             ->latest('updated_at')
             ->get();
     }
@@ -59,6 +57,7 @@ new class extends Component {
                     <thead>
                         <tr class="border-b border-zinc-200 dark:border-zinc-700">
                             <th class="py-2 pe-3">{{ __('Title') }}</th>
+                            <th class="py-2 pe-3">{{ __('Owner') }}</th>
                             <th class="py-2 pe-3">{{ __('Template') }}</th>
                             <th class="py-2 pe-3">{{ __('Slug') }}</th>
                             <th class="py-2 pe-3">{{ __('Status') }}</th>
@@ -70,6 +69,9 @@ new class extends Component {
                         @forelse ($this->landingPages as $landingPage)
                             <tr class="border-b border-zinc-100 align-top dark:border-zinc-800" wire:key="landing-page-{{ $landingPage->id }}">
                                 <td class="py-2 pe-3">{{ $landingPage->title }}</td>
+                                <td class="py-2 pe-3">
+                                    {{ $landingPage->user?->name ?: $landingPage->user?->email ?: __('Unknown') }}
+                                </td>
                                 <td class="py-2 pe-3">{{ $landingPage->template_snapshot['name'] ?? 'Template' }}</td>
                                 <td class="py-2 pe-3">
                                     @if (filled($landingPage->custom_domain))
@@ -110,7 +112,7 @@ new class extends Component {
                             </tr>
                         @empty
                             <tr>
-                                <td class="py-4" colspan="6">
+                                <td class="py-4" colspan="7">
                                     <flux:text>{{ __('No landing pages yet.') }}</flux:text>
                                 </td>
                             </tr>
