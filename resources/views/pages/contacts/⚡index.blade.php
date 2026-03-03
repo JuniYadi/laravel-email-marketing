@@ -2,6 +2,7 @@
 
 use App\Models\Contact;
 use App\Models\ContactGroup;
+use App\Support\CsvUploadedFileReader;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -200,7 +201,7 @@ new class extends Component
             'selectedGroupIds.*' => ['integer', 'exists:contact_groups,id'],
         ]);
 
-        $rows = array_map('str_getcsv', file($validated['csvFile']->getRealPath()));
+        $rows = CsvUploadedFileReader::readRows($validated['csvFile']);
 
         if ($rows === [] || ! isset($rows[0])) {
             return;
