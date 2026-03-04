@@ -177,8 +177,8 @@ jobs:
             ${{ needs.prepare.outputs.image_base }}:${{ github.ref_name }}-amd64
             ${{ needs.prepare.outputs.image_base }}:amd64
           labels: ${{ needs.prepare.outputs.version_labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,scope=docker-amd64,mode=min
 
       - name: Image digest
         run: |
@@ -222,8 +222,8 @@ jobs:
             ${{ needs.prepare.outputs.image_base }}:${{ github.ref_name }}-arm64
             ${{ needs.prepare.outputs.image_base }}:arm64
           labels: ${{ needs.prepare.outputs.version_labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,scope=docker-arm64,mode=min
 
       - name: Image digest
         run: |
