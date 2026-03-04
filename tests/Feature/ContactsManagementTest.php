@@ -1,14 +1,20 @@
 <?php
 
+use App\Jobs\ImportContactsFromCsv;
 use App\Models\Contact;
 use App\Models\ContactGroup;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 it('requires authentication for contacts page', function () {
     $this->get(route('contacts.index'))
         ->assertRedirect(route('login'));
+});
+
+beforeEach(function () {
+    config()->set('queue.default', 'sync');
 });
 
 it('allows creating a contact group from livewire page', function () {
@@ -253,4 +259,21 @@ it('disables import submit while csv upload is in progress', function () {
         ->assertSee('wire:loading.attr="disabled"', false)
         ->assertSee('wire:target="csvFile,importContacts"', false)
         ->assertSee('Uploading CSV file...');
+});
+
+it('queues import contacts job after csv upload submission', function () {
+    config()->set('queue.default', 'database');
+    Queue::fake();
+
+    $this->actingAs(User::factory()->create());
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', "email,firstName,lastName\nqueued@example.com,Queued,User\n");
+
+    Livewire::test('pages::contacts.index')
+        ->set('csvFile', $file)
+        ->call('importContacts')
+        ->assertHasNoErrors()
+        ->assertSet('showImportModal', false);
+
+    Queue::assertPushed(ImportContactsFromCsv::class);
 });
