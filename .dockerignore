@@ -7,6 +7,10 @@
 .claude
 .codex
 .opencode
+.worktrees
+.cursor
+.mcp.json
+opencode.json
 
 node_modules
 vendor
@@ -27,3 +31,7 @@ Thumbs.db
 
 docker-compose.yml
 docker-compose.*.yml
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
