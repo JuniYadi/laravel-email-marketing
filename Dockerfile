@@ -33,15 +33,6 @@ COPY . .
 # Install npm dependencies and build assets
 RUN npm install && npm run build
 
-# Create .env from .env.example and generate APP key
-RUN if [ -z "$APP_KEY" ]; then \
-    cp .env.example .env \
-    && php -r "echo 'APP_KEY=base64:' . base64_encode(random_bytes(32)) . PHP_EOL;" > /tmp/key.txt \
-    && grep -v "^APP_KEY=" .env > /tmp/.env.tmp \
-    && cat /tmp/key.txt >> /tmp/.env.tmp \
-    && mv /tmp/.env.tmp .env; \
-    fi
-
 # Clear bootstrap cache
 RUN rm -rf bootstrap/cache/*.php
 
