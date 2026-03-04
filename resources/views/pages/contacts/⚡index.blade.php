@@ -789,10 +789,15 @@ new class extends Component
                     <input
                         id="contacts-csv-file"
                         wire:model="csvFile"
+                        wire:loading.attr="disabled"
+                        wire:target="csvFile"
                         type="file"
                         accept=".csv,.txt,text/csv,text/plain"
                         class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-zinc-200 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/30 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:file:bg-zinc-800 dark:file:text-zinc-100 dark:hover:file:bg-zinc-700"
                     />
+                    <p wire:loading wire:target="csvFile" class="text-sm text-zinc-600 dark:text-zinc-300">
+                        {{ __('Uploading CSV file...') }}
+                    </p>
                     @error('csvFile')
                         <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
                     @enderror
@@ -816,7 +821,7 @@ new class extends Component
                     <flux:button wire:click="$set('showImportModal', false)" variant="ghost" type="button">
                         {{ __('Cancel') }}
                     </flux:button>
-                    <flux:button variant="primary" type="submit">
+                    <flux:button wire:loading.attr="disabled" wire:target="csvFile,importContacts" variant="primary" type="submit">
                         {{ __('Import Contacts') }}
                     </flux:button>
                 </div>
