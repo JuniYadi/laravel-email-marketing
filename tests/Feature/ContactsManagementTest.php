@@ -244,3 +244,13 @@ it('shows simplified contact page actions with a more dropdown', function () {
         ->assertSee('Export Contacts')
         ->assertSee('Export Groups');
 });
+
+it('disables import submit while csv upload is in progress', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('contacts.index'))
+        ->assertSuccessful()
+        ->assertSee('wire:loading.attr="disabled"', false)
+        ->assertSee('wire:target="csvFile,importContacts"', false)
+        ->assertSee('Uploading CSV file...');
+});
