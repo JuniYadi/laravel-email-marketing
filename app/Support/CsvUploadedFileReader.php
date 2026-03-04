@@ -13,7 +13,19 @@ class CsvUploadedFileReader
     {
         $contents = $uploadedFile->get();
 
-        if ($contents === false || trim($contents) === '') {
+        if ($contents === false) {
+            return [];
+        }
+
+        return self::readRowsFromContents($contents);
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    public static function readRowsFromContents(string $contents): array
+    {
+        if (trim($contents) === '') {
             return [];
         }
 
