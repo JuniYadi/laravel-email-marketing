@@ -27,11 +27,17 @@ RUN composer install \
     --optimize-autoloader \
     --no-ansi
 
+# Copy Node dependency manifests first for stable npm cache layer
+COPY package.json package-lock.json ./
+
+# Install frontend dependencies deterministically
+RUN npm ci
+
 # Copy application files
 COPY . .
 
-# Install npm dependencies and build assets
-RUN npm install && npm run build
+# Build frontend assets
+RUN npm run build
 
 # Clear bootstrap cache
 RUN rm -rf bootstrap/cache/*.php
