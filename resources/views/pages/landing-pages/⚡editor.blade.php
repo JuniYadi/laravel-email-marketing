@@ -4,13 +4,20 @@ use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Support\LandingPages\LandingPageRenderer;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
-new class extends Component {
+new class extends Component
+{
+    use WithFileUploads;
+
     public ?int $landingPageId = null;
 
     public ?int $selectedTemplateId = null;
@@ -50,6 +57,13 @@ new class extends Component {
      * @var array<string, mixed>
      */
     public array $templateSnapshot = [];
+
+    public mixed $metaOgImageUpload = null;
+
+    /**
+     * @var array<string, UploadedFile|null>
+     */
+    public array $imageUploads = [];
 
     public function mount(LandingPage|int|string|null $landingPage = null): void
     {
@@ -116,6 +130,38 @@ new class extends Component {
         }
 
         $this->applyTemplate($template);
+    }
+
+    public function updatedMetaOgImageUpload(): void
+    {
+        $file = $this->metaOgImageUpload;
+
+        if (! $file instanceof UploadedFile) {
+            return;
+        }
+
+        $this->validate([
+            'metaOgImageUpload' => ['nullable', 'image', 'max:4096'],
+        ]);
+
+        $this->meta['og_image'] = $this->storeLandingPageImage($file);
+        $this->reset('metaOgImageUpload');
+    }
+
+    public function updatedImageUploads(mixed $value, string $key): void
+    {
+        $file = $this->imageUploads[$key] ?? null;
+
+        if (! $file instanceof UploadedFile) {
+            return;
+        }
+
+        $this->validate([
+            'imageUploads.'.$key => ['nullable', 'image', 'max:4096'],
+        ]);
+
+        $this->formData[$key] = $this->storeLandingPageImage($file);
+        unset($this->imageUploads[$key]);
     }
 
     public function saveDraft(): void
@@ -330,7 +376,7 @@ new class extends Component {
 
         if ($this->landingPageId === null) {
             $landingPage = LandingPage::query()->create(array_merge($attributes, [
-                'user_id' => (int) auth()->id(),
+                'user_id' => (int) Auth::id(),
             ]));
 
             $this->landingPageId = $landingPage->id;
@@ -511,6 +557,23 @@ new class extends Component {
         return str_ends_with($domain, '.'.$wildcardRoot);
     }
 
+    protected function storeLandingPageImage(UploadedFile $file): string
+    {
+        $disk = 's3';
+        $path = $file->storePublicly('landing-page-images', ['disk' => $disk]);
+
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
+        $storage = Storage::disk($disk);
+
+        $configuredBaseUrl = trim((string) config('filesystems.disks.'.$disk.'.url'), '/');
+
+        if ($configuredBaseUrl !== '') {
+            return $configuredBaseUrl.'/'.$path;
+        }
+
+        return $storage->url($path);
+    }
+
     /**
      * @return array<string, string|bool>
      */
@@ -579,7 +642,14 @@ new class extends Component {
                         <flux:textarea wire:model="meta.description" :label="__('Meta Description')" rows="3" />
                         <flux:input wire:model="meta.og_title" :label="__('OG Title')" type="text" />
                         <flux:textarea wire:model="meta.og_description" :label="__('OG Description')" rows="3" />
-                        <flux:input wire:model="meta.og_image" :label="__('OG Image URL')" type="url" />
+                        <x-forms.image-upload
+                            :label="__('OG Image URL')"
+                            url-model="meta.og_image"
+                            upload-model="metaOgImageUpload"
+                            :current-url="(string) ($meta['og_image'] ?? '')"
+                            :help-text="__('Paste a public image URL or upload an image to store it on S3.')"
+                        />
+                        <flux:error name="metaOgImageUpload" />
 
                         <flux:field>
                             <flux:label>{{ __('Noindex') }}</flux:label>
@@ -634,7 +704,17 @@ new class extends Component {
                                         />
                                     @elseif ($fieldType === 'color')
                                         <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="color" :required="$fieldRequired" />
-                                    @elseif ($fieldType === 'image_url' || $fieldType === 'url')
+                                    @elseif ($fieldType === 'image_url')
+                                        <x-forms.image-upload
+                                            :label="$fieldLabel"
+                                            url-model="formData.{{ $fieldKey }}"
+                                            upload-model="imageUploads.{{ $fieldKey }}"
+                                            :current-url="(string) ($formData[$fieldKey] ?? '')"
+                                            :required="$fieldRequired"
+                                            :help-text="__('Paste a public image URL or upload an image to store it on S3.')"
+                                        />
+                                        <flux:error name="imageUploads.{{ $fieldKey }}" />
+                                    @elseif ($fieldType === 'url')
                                         <flux:input wire:model="formData.{{ $fieldKey }}" :label="$fieldLabel" type="url" :required="$fieldRequired" />
                                     @elseif ($fieldType === 'number')
                                         <flux:input
