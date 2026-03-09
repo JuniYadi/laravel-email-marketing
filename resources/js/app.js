@@ -1,3 +1,5 @@
+import 'trix';
+
 const CHART_JS_CDN = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js';
 
 const dashboardChartInstances = new WeakMap();

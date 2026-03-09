@@ -604,11 +604,32 @@ new class extends Component {
                                 @endphp
 
                                 <div wire:key="landing-page-template-{{ $selectedTemplateId ?? 'none' }}-field-{{ $fieldKey }}-{{ $fieldIndex }}">
-                                    @if ($fieldType === 'textarea' || $fieldType === 'richtext')
+                                    @if ($fieldType === 'richtext')
+                                        <flux:field>
+                                            <flux:label>{{ $fieldLabel }}</flux:label>
+                                            <div
+                                                wire:ignore
+                                                x-data="{ trixInputId: 'landing-page-richtext-{{ $selectedTemplateId ?? 'none' }}-{{ $fieldKey }}-{{ $fieldIndex }}' }"
+                                                class="rounded-md border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                                            >
+                                                <input
+                                                    :id="trixInputId"
+                                                    type="hidden"
+                                                    value="{{ (string) ($formData[$fieldKey] ?? '') }}"
+                                                >
+                                                <trix-editor
+                                                    :input="trixInputId"
+                                                    x-on:trix-change="$wire.set('formData.{{ $fieldKey }}', $event.target.value)"
+                                                    class="min-h-32 border-none bg-transparent px-3 py-2 text-sm text-zinc-900 outline-hidden ring-0 focus:ring-0 dark:text-zinc-100"
+                                                    @if ($fieldRequired) required @endif
+                                                ></trix-editor>
+                                            </div>
+                                        </flux:field>
+                                    @elseif ($fieldType === 'textarea')
                                         <flux:textarea
                                             wire:model="formData.{{ $fieldKey }}"
                                             :label="$fieldLabel"
-                                            rows="{{ $fieldType === 'richtext' ? 6 : 4 }}"
+                                            rows="4"
                                             :required="$fieldRequired"
                                         />
                                     @elseif ($fieldType === 'color')

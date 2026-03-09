@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../../vendor/livewire/flux/dist/flux.css';
+@import 'trix/dist/trix.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -59,6 +60,48 @@ input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+}
+
+trix-editor {
+    @apply min-h-32 rounded-md border-0 bg-transparent text-sm leading-relaxed text-zinc-900 outline-hidden;
+}
+
+.trix-button-group {
+    @apply !mb-2;
+}
+
+trix-toolbar .trix-button-group {
+    @apply !me-2 !rounded-md !border-zinc-200 dark:!border-zinc-700;
+}
+
+trix-toolbar .trix-button {
+    @apply !border-zinc-200 !bg-white hover:!bg-zinc-100 dark:!border-zinc-700 dark:!bg-zinc-900 dark:hover:!bg-zinc-800;
+}
+
+trix-toolbar .trix-button.trix-active {
+    @apply !bg-zinc-200 dark:!bg-zinc-700;
+}
+
+trix-toolbar .trix-button-group--file-tools,
+trix-toolbar .trix-button--icon-code,
+trix-toolbar .trix-button--icon-quote,
+trix-toolbar .trix-button--icon-attach,
+trix-toolbar .trix-button--icon-heading-1 {
+    display: none !important;
+}
+
+trix-editor ul,
+.trix-content ul {
+    list-style: disc;
+    margin: 0.5rem 0;
+    padding-inline-start: 1.25rem;
+}
+
+trix-editor ol,
+.trix-content ol {
+    list-style: decimal;
+    margin: 0.5rem 0;
+    padding-inline-start: 1.25rem;
 }
 
 /* \[:where(&)\]:size-4 {
