@@ -61,7 +61,7 @@ ENV NGINX_TRUST_CLOUDFLARE=1
 COPY --from=builder --chown=www-data:www-data /app /var/www/html
 
 # Set permissions for storage and cache
-RUN chmod -R 775 storage bootstrap/cache || true
+RUN mkdir -p bootstrap/cache storage && chmod -R 775 storage bootstrap/cache || true
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
