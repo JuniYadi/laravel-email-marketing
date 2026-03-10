@@ -560,7 +560,7 @@ new class extends Component
     protected function storeLandingPageImage(UploadedFile $file): string
     {
         $disk = 's3';
-        $path = $file->storePublicly('landing-page-images', ['disk' => $disk]);
+        $path = $file->storePublicly(path: 'landing-page-images', options: $disk);
 
         /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
         $storage = Storage::disk($disk);
