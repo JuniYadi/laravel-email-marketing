@@ -259,27 +259,32 @@ class BuilderPage extends Component
             return;
         }
 
-        $this->validate([
-            "imageUploads.$rowIndex.$columnIndex.$elementIndex" => ['nullable', 'image', 'max:4096'],
-        ]);
-
         $file = $this->imageUploads[$rowIndex][$columnIndex][$elementIndex] ?? null;
 
         if (! $file instanceof UploadedFile) {
             return;
         }
 
-        // Use configured filesystem disk (supports local, public, or s3)
-        $disk = config('filesystems.default');
-        $path = $file->store(path: 'email-templates', options: $disk);
+        try {
+            $this->validate([
+                "imageUploads.$rowIndex.$columnIndex.$elementIndex" => ['nullable', 'image', 'max:4096'],
+            ]);
 
-        // Generate public URL for the stored file
-        $url = Storage::disk($disk)->url($path);
+            // Use configured filesystem disk (supports local, public, or s3)
+            $disk = config('filesystems.default');
+            $path = $file->store(path: 'email-templates', options: $disk);
 
-        $element = $this->rows[$rowIndex]['columns'][$columnIndex]['elements'][$elementIndex];
+            // Generate public URL for the stored file
+            $url = Storage::disk($disk)->url($path);
 
-        if (($element['type'] ?? '') === 'image') {
-            $this->rows[$rowIndex]['columns'][$columnIndex]['elements'][$elementIndex]['content']['url'] = $url;
+            $element = $this->rows[$rowIndex]['columns'][$columnIndex]['elements'][$elementIndex];
+
+            if (($element['type'] ?? '') === 'image') {
+                $this->rows[$rowIndex]['columns'][$columnIndex]['elements'][$elementIndex]['content']['url'] = $url;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError("imageUploads.$rowIndex.$columnIndex.$elementIndex", __('Failed to upload image. Please try again.'));
         }
 
         unset($this->imageUploads[$rowIndex][$columnIndex][$elementIndex]);

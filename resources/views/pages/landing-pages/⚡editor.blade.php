@@ -140,11 +140,17 @@ new class extends Component
             return;
         }
 
-        $this->validate([
-            'metaOgImageUpload' => ['nullable', 'image', 'max:4096'],
-        ]);
+        try {
+            $this->validate([
+                'metaOgImageUpload' => ['nullable', 'image', 'max:4096'],
+            ]);
 
-        $this->meta['og_image'] = $this->storeLandingPageImage($file);
+            $this->meta['og_image'] = $this->storeLandingPageImage($file);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('metaOgImageUpload', __('Failed to upload image. Please try again.'));
+        }
+
         $this->reset('metaOgImageUpload');
     }
 
@@ -156,11 +162,17 @@ new class extends Component
             return;
         }
 
-        $this->validate([
-            'imageUploads.'.$key => ['nullable', 'image', 'max:4096'],
-        ]);
+        try {
+            $this->validate([
+                'imageUploads.'.$key => ['nullable', 'image', 'max:4096'],
+            ]);
 
-        $this->formData[$key] = $this->storeLandingPageImage($file);
+            $this->formData[$key] = $this->storeLandingPageImage($file);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('imageUploads.'.$key, __('Failed to upload image. Please try again.'));
+        }
+
         unset($this->imageUploads[$key]);
     }
 
