@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\LandingPageController;
+use App\Http\Controllers\LandingPages\LandingPageImageController;
 use App\Http\Controllers\Templates\TemplateAttachmentController;
 use App\Livewire\Templates\BuilderPage;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +62,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('finalize', [TemplateAttachmentController::class, 'finalize'])->name('finalize');
         Route::delete('', [TemplateAttachmentController::class, 'delete'])->name('delete');
         Route::post('cleanup-unsaved', [TemplateAttachmentController::class, 'cleanupUnsaved'])->name('cleanup-unsaved');
+    });
+
+    Route::prefix('landing-pages/images')->name('landing-pages.images.')->group(function () {
+        Route::post('presign', [LandingPageImageController::class, 'presign'])->name('presign');
     });
 });
 
