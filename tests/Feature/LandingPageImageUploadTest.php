@@ -1,101 +1,82 @@
 <?php
 
-use App\Models\LandingPage;
-use App\Models\LandingPageTemplate;
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
 
-use function Pest\Laravel\actingAs;
+beforeEach(function (): void {
+    $this->actingAs(User::factory()->create());
+});
 
-it('stores uploaded og images on s3 and persists the public url', function () {
+it('generates presigned upload URL for valid image', function () {
     config()->set('filesystems.disks.s3.url', 'https://cdn.example.com');
     Storage::fake('s3');
 
-    actingAs(User::factory()->create());
-
-    $template = LandingPageTemplate::factory()->create([
-        'schema' => [
-            'fields' => [
-                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
-            ],
-        ],
+    $response = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'test-image.png',
+        'file_size' => 1024,
+        'mime_type' => 'image/png',
     ]);
 
-    Livewire::test('pages::landing-pages.editor')
-        ->set('selectedTemplateId', $template->id)
-        ->set('title', 'S3 Meta Image')
-        ->set('slug', 's3-meta-image')
-        ->set('meta.title', 'S3 Meta Image')
-        ->set('formData.headline', 'Hero headline')
-        ->set('metaOgImageUpload', UploadedFile::fake()->image('og-banner.png'))
-        ->call('saveDraft')
-        ->assertHasNoErrors();
+    $response->assertOk();
 
-    $landingPage = LandingPage::query()->where('slug', 's3-meta-image')->firstOrFail();
-    $ogImageUrl = (string) data_get($landingPage->meta, 'og_image');
+    $data = $response->json();
 
-    expect($ogImageUrl)->toStartWith('https://cdn.example.com/landing-page-images/');
-
-    $storedPath = ltrim((string) str($ogImageUrl)->after('https://cdn.example.com/'), '/');
-    expect(Storage::disk('s3')->exists($storedPath))->toBeTrue();
+    expect($data['path'])->toStartWith('landing-page-images/');
+    expect($data['upload_url'])->toBeString();
+    expect($data['public_url'])->toStartWith('https://cdn.example.com/landing-page-images/');
+    expect($data['public_url'])->toContain('.png');
 });
 
-it('stores uploaded template images on s3 and saves the generated public url', function () {
+it('rejects non-image mime types for landing page images', function () {
+    $response = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'document.pdf',
+        'file_size' => 1024,
+        'mime_type' => 'application/pdf',
+    ]);
+
+    $response->assertStatus(422);
+});
+
+it('rejects files larger than 4MB for landing page images', function () {
+    $response = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'large-image.png',
+        'file_size' => 5000000, // 5MB
+        'mime_type' => 'image/png',
+    ]);
+
+    $response->assertStatus(422);
+});
+
+it('requires authentication for landing page image upload', function () {
+    $this->actingAs(null);
+
+    $response = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'test-image.png',
+        'file_size' => 1024,
+        'mime_type' => 'image/png',
+    ]);
+
+    $response->assertStatus(401);
+});
+
+it('generates unique paths for each landing page image upload', function () {
     config()->set('filesystems.disks.s3.url', 'https://cdn.example.com');
     Storage::fake('s3');
 
-    actingAs(User::factory()->create());
-
-    $template = LandingPageTemplate::factory()->create([
-        'schema' => [
-            'fields' => [
-                ['key' => 'hero_image', 'label' => 'Hero Image', 'type' => 'image_url', 'required' => false],
-                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
-            ],
-        ],
+    $response1 = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'test-image.png',
+        'file_size' => 1024,
+        'mime_type' => 'image/png',
     ]);
 
-    Livewire::test('pages::landing-pages.editor')
-        ->set('selectedTemplateId', $template->id)
-        ->set('title', 'S3 Template Image')
-        ->set('slug', 's3-template-image')
-        ->set('meta.title', 'S3 Template Image')
-        ->set('formData.headline', 'Hero headline')
-        ->set('imageUploads.hero_image', UploadedFile::fake()->image('hero.png'))
-        ->call('saveDraft')
-        ->assertHasNoErrors();
-
-    $landingPage = LandingPage::query()->where('slug', 's3-template-image')->firstOrFail();
-    $heroImageUrl = (string) data_get($landingPage->form_data, 'hero_image');
-
-    expect($heroImageUrl)->toStartWith('https://cdn.example.com/landing-page-images/');
-
-    $storedPath = ltrim((string) str($heroImageUrl)->after('https://cdn.example.com/'), '/');
-    expect(Storage::disk('s3')->exists($storedPath))->toBeTrue();
-});
-
-it('rejects non-image uploads for landing page image fields', function () {
-    Storage::fake('s3');
-
-    actingAs(User::factory()->create());
-
-    $template = LandingPageTemplate::factory()->create([
-        'schema' => [
-            'fields' => [
-                ['key' => 'hero_image', 'label' => 'Hero Image', 'type' => 'image_url', 'required' => false],
-                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
-            ],
-        ],
+    $response2 = $this->postJson(route('landing-pages.images.presign'), [
+        'file_name' => 'test-image.png',
+        'file_size' => 1024,
+        'mime_type' => 'image/png',
     ]);
 
-    Livewire::test('pages::landing-pages.editor')
-        ->set('selectedTemplateId', $template->id)
-        ->set('title', 'Invalid Upload')
-        ->set('slug', 'invalid-upload')
-        ->set('meta.title', 'Invalid Upload')
-        ->set('formData.headline', 'Hero headline')
-        ->set('imageUploads.hero_image', UploadedFile::fake()->create('brochure.pdf', 100, 'application/pdf'))
-        ->assertHasErrors(['imageUploads.hero_image']);
+    $path1 = $response1->json('path');
+    $path2 = $response2->json('path');
+
+    expect($path1)->not->toBe($path2);
 });
