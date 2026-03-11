@@ -58,15 +58,15 @@ it('fails sync command when metadata is invalid and fail-on-invalid is enabled',
 
 it('refreshes existing landing page snapshots and removes stale form keys', function () {
     $template = LandingPageTemplate::factory()->create([
-        'key' => 'template-event',
-        'name' => 'Template Event',
+        'key' => 'basic',
+        'name' => 'Basic',
         'description' => 'Updated schema',
-        'view_path' => 'landing-page-templates.template-event.view',
+        'view_path' => 'landing-page-templates.basic.view',
         'version' => 2,
         'schema' => [
             'fields' => [
-                ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
-                ['key' => 'about_body', 'label' => 'About Body', 'type' => 'textarea', 'required' => true],
+                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
+                ['key' => 'body', 'label' => 'Body', 'type' => 'textarea', 'required' => true],
             ],
             'meta' => ['render_mode' => 'standalone'],
         ],
@@ -76,21 +76,21 @@ it('refreshes existing landing page snapshots and removes stale form keys', func
     $landingPage = LandingPage::factory()->create([
         'landing_page_template_id' => $template->id,
         'template_snapshot' => [
-            'key' => 'template-event',
-            'name' => 'Template Event',
+            'key' => 'basic',
+            'name' => 'Basic',
             'description' => 'Old snapshot',
-            'view_path' => 'landing-page-templates.template-event.view',
+            'view_path' => 'landing-page-templates.basic.view',
             'version' => 1,
             'schema' => [
                 'fields' => [
-                    ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
-                    ['key' => 'about_vector_mobile_image', 'label' => 'About Vector Mobile Image', 'type' => 'image_url', 'required' => true],
+                    ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
+                    ['key' => 'legacy_field', 'label' => 'Legacy Field', 'type' => 'text', 'required' => false],
                 ],
             ],
         ],
         'form_data' => [
-            'about_title' => 'About Us',
-            'about_vector_mobile_image' => '/img/about-vector-mobile.png',
+            'headline' => 'About Us',
+            'legacy_field' => 'Old value',
         ],
     ]);
 
@@ -107,9 +107,9 @@ it('refreshes existing landing page snapshots and removes stale form keys', func
     $landingPage->refresh();
 
     expect(data_get($landingPage->template_snapshot, 'version'))->toBe(2)
-        ->and(data_get($landingPage->template_snapshot, 'schema.fields.0.key'))->toBe('about_title')
-        ->and(collect(data_get($landingPage->template_snapshot, 'schema.fields', []))->pluck('key')->contains('about_vector_mobile_image'))->toBeFalse()
+        ->and(data_get($landingPage->template_snapshot, 'schema.fields.0.key'))->toBe('headline')
+        ->and(collect(data_get($landingPage->template_snapshot, 'schema.fields', []))->pluck('key')->contains('legacy_field'))->toBeFalse()
         ->and($landingPage->form_data)->toBe([
-            'about_title' => 'About Us',
+            'headline' => 'About Us',
         ]);
 });

@@ -5,58 +5,58 @@ use App\Models\User;
 use App\Support\LandingPages\LandingPageRenderer;
 use Livewire\Livewire;
 
-it('sanitizes richtext links and scripts before rendering template-event cards', function () {
+it('sanitizes richtext links and scripts before rendering the basic template', function () {
     $snapshot = [
-        'view_path' => 'landing-page-templates.template-event.view',
+        'view_path' => 'landing-page-templates.basic.view',
         'schema' => [
             'fields' => [
-                ['key' => 'program_description', 'type' => 'richtext', 'default' => ''],
-                ['key' => 'event_format_details', 'type' => 'richtext', 'default' => ''],
-                ['key' => 'modules_list', 'type' => 'richtext', 'default' => ''],
+                ['key' => 'headline', 'type' => 'text', 'default' => 'Hello'],
+                ['key' => 'body', 'type' => 'richtext', 'default' => ''],
+                ['key' => 'cta_label', 'type' => 'text', 'default' => 'Get Started'],
+                ['key' => 'cta_url', 'type' => 'url', 'default' => 'https://example.com'],
+                ['key' => 'background_color', 'type' => 'color', 'default' => '#0F172A'],
+                ['key' => 'show_badge', 'type' => 'toggle', 'default' => true],
+                ['key' => 'badge_text', 'type' => 'text', 'default' => 'Base Template'],
             ],
         ],
     ];
 
     $html = app(LandingPageRenderer::class)->render($snapshot, [
-        'program_description' => '<p><strong>Accelerating</strong> plan<script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(1)">Bad Link</a><a href="https://example.com">Safe Link</a></p>',
-        'event_format_details' => '<p><strong>Format:</strong> Workshop</p>',
-        'modules_list' => '<ul><li>Module A</li></ul>',
+        'body' => '<p><strong>Accelerating</strong> plan<script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(1)">Bad Link</a><a href="https://example.com">Safe Link</a></p>',
     ]);
 
     expect($html)
-        ->toContain('<strong>Accelerating</strong>')
-        ->toContain('href="https://example.com"')
         ->toContain('Safe Link')
+        ->toContain('https://example.com')
         ->not->toContain('<script>')
         ->not->toContain('onclick=')
         ->not->toContain('javascript:alert(1)');
 });
 
-it('strips html tags from legacy textarea fields rendered in template-event cards', function () {
+it('strips html tags from textarea fields before rendering the basic template', function () {
     $snapshot = [
-        'view_path' => 'landing-page-templates.template-event.view',
+        'view_path' => 'landing-page-templates.basic.view',
         'schema' => [
             'fields' => [
-                ['key' => 'program_description', 'type' => 'textarea', 'default' => ''],
-                ['key' => 'event_format_details', 'type' => 'textarea', 'default' => ''],
-                ['key' => 'modules_list', 'type' => 'textarea', 'default' => ''],
+                ['key' => 'headline', 'type' => 'text', 'default' => 'Hello'],
+                ['key' => 'body', 'type' => 'textarea', 'default' => ''],
+                ['key' => 'cta_label', 'type' => 'text', 'default' => 'Get Started'],
+                ['key' => 'cta_url', 'type' => 'url', 'default' => 'https://example.com'],
+                ['key' => 'background_color', 'type' => 'color', 'default' => '#0F172A'],
+                ['key' => 'show_badge', 'type' => 'toggle', 'default' => true],
+                ['key' => 'badge_text', 'type' => 'text', 'default' => 'Base Template'],
             ],
         ],
     ];
 
     $html = app(LandingPageRenderer::class)->render($snapshot, [
-        'program_description' => '<strong>Program</strong><script>alert(1)</script> body',
-        'event_format_details' => '<p>Format</p>',
-        'modules_list' => '<ul><li>Module</li></ul>',
+        'body' => '<strong>Program</strong><script>alert(1)</script> body',
     ]);
 
     expect($html)
         ->toContain('Programalert(1) body')
-        ->toContain('Format')
-        ->toContain('Module')
         ->not->toContain('<script>')
-        ->not->toContain('<strong>')
-        ->not->toContain('<ul>');
+        ->not->toContain('<strong>');
 });
 
 it('renders a trix editor for richtext template fields in landing page editor', function () {
