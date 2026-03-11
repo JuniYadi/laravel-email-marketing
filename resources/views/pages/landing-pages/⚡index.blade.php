@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\LandingPage;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -28,6 +29,25 @@ new class extends Component {
         ]);
     }
 
+    public function syncTemplates(): void
+    {
+        try {
+            Artisan::call('landing-pages:sync-templates', [
+                '--no-interaction' => true,
+            ]);
+        } catch (\Throwable $exception) {
+            session()->flash('landing_pages_notice', __('Template sync failed: :message', [
+                'message' => $exception->getMessage(),
+            ]));
+            session()->flash('landing_pages_notice_type', 'error');
+
+            return;
+        }
+
+        session()->flash('landing_pages_notice', trim(Artisan::output()) ?: __('Templates synced successfully.'));
+        session()->flash('landing_pages_notice_type', 'success');
+    }
+
     #[Computed]
     public function landingPages(): Collection
     {
@@ -46,10 +66,27 @@ new class extends Component {
                 <flux:text class="mt-2">{{ __('Create reusable landing pages from predefined template designs.') }}</flux:text>
             </div>
 
-            <flux:button :href="route('landing-pages.create')" variant="primary" wire:navigate>
-                {{ __('New Landing Page') }}
-            </flux:button>
+            <div class="flex items-center gap-2">
+                <flux:button wire:click="syncTemplates" variant="ghost" wire:loading.attr="disabled" wire:target="syncTemplates">
+                    <span wire:loading.remove wire:target="syncTemplates">{{ __('Sync Templates') }}</span>
+                    <span wire:loading wire:target="syncTemplates">{{ __('Syncing...') }}</span>
+                </flux:button>
+
+                <flux:button :href="route('landing-pages.create')" variant="primary" wire:navigate>
+                    {{ __('New Landing Page') }}
+                </flux:button>
+            </div>
         </div>
+
+        @if (session()->has('landing_pages_notice'))
+            <div @class([
+                'rounded-lg border px-4 py-3 text-sm',
+                'border-emerald-300 bg-emerald-50 text-emerald-800' => session('landing_pages_notice_type') !== 'error',
+                'border-red-300 bg-red-50 text-red-700' => session('landing_pages_notice_type') === 'error',
+            ])>
+                {{ session('landing_pages_notice') }}
+            </div>
+        @endif
 
         <div class="rounded-xl border border-zinc-200 p-6 dark:border-zinc-700">
             <div class="overflow-x-auto">
