@@ -213,11 +213,11 @@ it('sync templates button refreshes stale landing page snapshot schema in index 
     $this->actingAs($user);
 
     $template = LandingPageTemplate::factory()->create([
-        'key' => 'template-event',
-        'name' => 'Template Event',
+        'key' => 'basic',
+        'name' => 'Basic',
         'schema' => [
             'fields' => [
-                ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
+                ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
             ],
             'meta' => ['render_mode' => 'standalone'],
         ],
@@ -226,21 +226,21 @@ it('sync templates button refreshes stale landing page snapshot schema in index 
     $landingPage = LandingPage::factory()->create([
         'landing_page_template_id' => $template->id,
         'template_snapshot' => [
-            'key' => 'template-event',
-            'name' => 'Template Event',
+            'key' => 'basic',
+            'name' => 'Basic',
             'description' => 'Old snapshot',
-            'view_path' => 'landing-page-templates.template-event.view',
+            'view_path' => 'landing-page-templates.basic.view',
             'version' => 1,
             'schema' => [
                 'fields' => [
-                    ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
-                    ['key' => 'about_vector_mobile_image', 'label' => 'About Vector Mobile Image', 'type' => 'image_url', 'required' => true],
+                    ['key' => 'headline', 'label' => 'Headline', 'type' => 'text', 'required' => true],
+                    ['key' => 'legacy_field', 'label' => 'Legacy Field', 'type' => 'text', 'required' => false],
                 ],
             ],
         ],
         'form_data' => [
-            'about_title' => 'About Us',
-            'about_vector_mobile_image' => '/img/about-vector-mobile.png',
+            'headline' => 'About Us',
+            'legacy_field' => 'Old value',
         ],
     ]);
 
@@ -249,8 +249,8 @@ it('sync templates button refreshes stale landing page snapshot schema in index 
 
     $landingPage->refresh();
 
-    expect(collect(data_get($landingPage->template_snapshot, 'schema.fields', []))->pluck('key')->contains('about_vector_mobile_image'))->toBeFalse()
+    expect(collect(data_get($landingPage->template_snapshot, 'schema.fields', []))->pluck('key')->contains('legacy_field'))->toBeFalse()
         ->and($landingPage->form_data)->toBe([
-            'about_title' => 'About Us',
+            'headline' => 'About Us',
         ]);
 });
