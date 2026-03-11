@@ -22,7 +22,7 @@ test('speaker card uses constrained image height on single-column layout', funct
         ->toContain('h-full w-full object-cover');
 });
 
-test('about footer uses figma-aligned desktop and mobile geometry classes', function () {
+test('about footer renders the expected vector and image layout classes', function () {
     $html = view('landing-page-templates.template-event.view', [
         'data' => [
             'about_title' => 'About Us',
@@ -35,11 +35,11 @@ test('about footer uses figma-aligned desktop and mobile geometry classes', func
     ])->render();
 
     expect($html)
-        ->toContain('left-1/2 top-[423px] z-0 h-[677px] w-[391px] -translate-x-1/2 lg:hidden')
-        ->toContain('right-[-334px] top-[31px] hidden h-[485px] w-[839px] lg:block')
-        ->toContain('left-1/2 top-[36px] z-10 w-[350px] -translate-x-1/2 text-center font-serif text-[32px]')
-        ->toContain('lg:left-[calc(30%-197px)] lg:top-[115px] lg:w-[392px]')
-        ->toContain('left-1/2 top-[94px] z-10 w-[300px] -translate-x-1/2 whitespace-pre-line text-[16px]')
-        ->toContain('left-1/2 top-[354px] z-10 h-[180px] w-[300px] -translate-x-1/2 overflow-hidden')
-        ->toContain('lg:left-[calc(40%+129px)] lg:top-[123px] lg:h-[300px] lg:w-[500px] lg:translate-x-0');
+        ->toContain('relative mx-auto w-full max-w-[1440px] px-8 py-16 lg:h-[542px] lg:px-16 lg:py-0')
+        ->toContain('grid grid-cols-1 items-center gap-10 lg:grid-cols-[392px_1fr] lg:items-start lg:pt-[115px]')
+        ->toContain('text-[48px] font-black leading-[normal] text-[#f2f1f0]')
+        ->toContain('mt-6 whitespace-pre-line text-[20px] leading-[normal] text-[#f2f1f0]')
+        ->toContain('pointer-events-none absolute inset-0 z-0 hidden opacity-90 lg:block lg:translate-x-[88px]')
+        ->toContain('relative z-10 h-full w-full overflow-hidden rounded-[24px] bg-[#f2f1f0] shadow-[0_0_4px_0_rgba(0,0,0,0.25)]')
+        ->toContain('absolute left-1/2 top-1/2 h-full w-[532px] -translate-x-1/2 -translate-y-1/2 lg:h-[300px]');
 });
