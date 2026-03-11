@@ -207,3 +207,50 @@ it('allows only the owner to delete a landing page', function () {
     expect($owner->can('delete', $landingPage))->toBeTrue();
     expect($otherUser->can('delete', $landingPage))->toBeFalse();
 });
+
+it('sync templates button refreshes stale landing page snapshot schema in index page', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => 'template-event',
+        'name' => 'Template Event',
+        'schema' => [
+            'fields' => [
+                ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
+            ],
+            'meta' => ['render_mode' => 'standalone'],
+        ],
+    ]);
+
+    $landingPage = LandingPage::factory()->create([
+        'landing_page_template_id' => $template->id,
+        'template_snapshot' => [
+            'key' => 'template-event',
+            'name' => 'Template Event',
+            'description' => 'Old snapshot',
+            'view_path' => 'landing-page-templates.template-event.view',
+            'version' => 1,
+            'schema' => [
+                'fields' => [
+                    ['key' => 'about_title', 'label' => 'About Title', 'type' => 'text', 'required' => true],
+                    ['key' => 'about_vector_mobile_image', 'label' => 'About Vector Mobile Image', 'type' => 'image_url', 'required' => true],
+                ],
+            ],
+        ],
+        'form_data' => [
+            'about_title' => 'About Us',
+            'about_vector_mobile_image' => '/img/about-vector-mobile.png',
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.index')
+        ->call('syncTemplates');
+
+    $landingPage->refresh();
+
+    expect(collect(data_get($landingPage->template_snapshot, 'schema.fields', []))->pluck('key')->contains('about_vector_mobile_image'))->toBeFalse()
+        ->and($landingPage->form_data)->toBe([
+            'about_title' => 'About Us',
+        ]);
+});
