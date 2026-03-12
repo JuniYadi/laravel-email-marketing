@@ -23,6 +23,7 @@ class LandingPageTemplateRegistry
         'number',
         'select',
         'toggle',
+        'repeater',
     ];
 
     /**
@@ -149,73 +150,7 @@ class LandingPageTemplateRegistry
                 throw new InvalidArgumentException('Template ['.$key.'] contains malformed field entries');
             }
 
-            $fieldKey = (string) ($field['key'] ?? '');
-            $fieldLabel = (string) ($field['label'] ?? '');
-            $type = (string) ($field['type'] ?? '');
-
-            if ($fieldKey === '' || $fieldLabel === '') {
-                throw new InvalidArgumentException('Template ['.$key.'] has fields missing key or label');
-            }
-
-            if (! in_array($type, $this->allowedFieldTypes, true)) {
-                throw new InvalidArgumentException('Template ['.$key.'] field ['.$fieldKey.'] has unsupported type ['.$type.']');
-            }
-
-            $normalized = [
-                'key' => $fieldKey,
-                'label' => $fieldLabel,
-                'type' => $type,
-                'required' => (bool) ($field['required'] ?? false),
-            ];
-
-            if (isset($field['default'])) {
-                $normalized['default'] = $field['default'];
-            }
-
-            if (isset($field['min']) && is_numeric($field['min'])) {
-                $normalized['min'] = (float) $field['min'];
-            }
-
-            if (isset($field['max']) && is_numeric($field['max'])) {
-                $normalized['max'] = (float) $field['max'];
-            }
-
-            if ($type === 'select') {
-                $options = $field['options'] ?? [];
-
-                if (! is_array($options) || $options === []) {
-                    throw new InvalidArgumentException('Template ['.$key.'] select field ['.$fieldKey.'] requires options');
-                }
-
-                $normalizedOptions = [];
-
-                foreach ($options as $option) {
-                    if (is_array($option)) {
-                        $value = (string) ($option['value'] ?? '');
-                        $label = (string) ($option['label'] ?? $value);
-                    } else {
-                        $value = (string) $option;
-                        $label = (string) $option;
-                    }
-
-                    if ($value === '') {
-                        continue;
-                    }
-
-                    $normalizedOptions[] = [
-                        'value' => $value,
-                        'label' => $label,
-                    ];
-                }
-
-                if ($normalizedOptions === []) {
-                    throw new InvalidArgumentException('Template ['.$key.'] select field ['.$fieldKey.'] has no valid options');
-                }
-
-                $normalized['options'] = $normalizedOptions;
-            }
-
-            $normalizedFields[] = $normalized;
+            $normalizedFields[] = $this->normalizeField($field, $key);
         }
 
         return [
@@ -234,5 +169,124 @@ class LandingPageTemplateRegistry
                 : null,
             'version' => max(1, (int) ($definition['version'] ?? 1)),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>
+     */
+    protected function normalizeField(array $field, string $templateKey, string $parentPath = ''): array
+    {
+        $fieldKey = (string) ($field['key'] ?? '');
+        $fieldLabel = (string) ($field['label'] ?? '');
+        $type = (string) ($field['type'] ?? '');
+
+        if ($fieldKey === '' || $fieldLabel === '') {
+            throw new InvalidArgumentException('Template ['.$templateKey.'] has fields missing key or label');
+        }
+
+        if (! in_array($type, $this->allowedFieldTypes, true)) {
+            throw new InvalidArgumentException('Template ['.$templateKey.'] field ['.$this->fullFieldPath($parentPath, $fieldKey).'] has unsupported type ['.$type.']');
+        }
+
+        $normalized = [
+            'key' => $fieldKey,
+            'label' => $fieldLabel,
+            'type' => $type,
+            'required' => (bool) ($field['required'] ?? false),
+        ];
+
+        if (isset($field['default'])) {
+            if ($type === 'repeater' && ! is_array($field['default'])) {
+                throw new InvalidArgumentException('Template ['.$templateKey.'] repeater field ['.$this->fullFieldPath($parentPath, $fieldKey).'] default must be an array');
+            }
+
+            $normalized['default'] = $field['default'];
+        }
+
+        if (isset($field['min']) && is_numeric($field['min'])) {
+            $normalized['min'] = (float) $field['min'];
+        }
+
+        if (isset($field['max']) && is_numeric($field['max'])) {
+            $normalized['max'] = (float) $field['max'];
+        }
+
+        if ($type === 'select') {
+            $normalized['options'] = $this->normalizeSelectOptions($field, $templateKey, $parentPath);
+        }
+
+        if ($type === 'repeater') {
+            $nestedFields = $field['fields'] ?? [];
+
+            if (! is_array($nestedFields) || $nestedFields === []) {
+                throw new InvalidArgumentException('Template ['.$templateKey.'] repeater field ['.$this->fullFieldPath($parentPath, $fieldKey).'] requires nested fields');
+            }
+
+            $normalizedNestedFields = [];
+
+            foreach ($nestedFields as $nestedField) {
+                if (! is_array($nestedField)) {
+                    throw new InvalidArgumentException('Template ['.$templateKey.'] repeater field ['.$this->fullFieldPath($parentPath, $fieldKey).'] contains malformed nested fields');
+                }
+
+                $normalizedNestedFields[] = $this->normalizeField(
+                    $nestedField,
+                    $templateKey,
+                    $this->fullFieldPath($parentPath, $fieldKey),
+                );
+            }
+
+            $normalized['fields'] = $normalizedNestedFields;
+            $normalized['default'] = is_array($normalized['default'] ?? null) ? $normalized['default'] : [];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return list<array{value: string, label: string}>
+     */
+    protected function normalizeSelectOptions(array $field, string $templateKey, string $parentPath = ''): array
+    {
+        $fieldKey = (string) ($field['key'] ?? '');
+        $options = $field['options'] ?? [];
+
+        if (! is_array($options) || $options === []) {
+            throw new InvalidArgumentException('Template ['.$templateKey.'] select field ['.$this->fullFieldPath($parentPath, $fieldKey).'] requires options');
+        }
+
+        $normalizedOptions = [];
+
+        foreach ($options as $option) {
+            if (is_array($option)) {
+                $value = (string) ($option['value'] ?? '');
+                $label = (string) ($option['label'] ?? $value);
+            } else {
+                $value = (string) $option;
+                $label = (string) $option;
+            }
+
+            if ($value === '') {
+                continue;
+            }
+
+            $normalizedOptions[] = [
+                'value' => $value,
+                'label' => $label,
+            ];
+        }
+
+        if ($normalizedOptions === []) {
+            throw new InvalidArgumentException('Template ['.$templateKey.'] select field ['.$this->fullFieldPath($parentPath, $fieldKey).'] has no valid options');
+        }
+
+        return $normalizedOptions;
+    }
+
+    protected function fullFieldPath(string $parentPath, string $fieldKey): string
+    {
+        return $parentPath === '' ? $fieldKey : $parentPath.'.'.$fieldKey;
     }
 }
