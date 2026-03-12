@@ -624,22 +624,44 @@ new class extends Component
                                                         const input = this.$refs.input;
                                                         const editor = this.$refs.editor;
 
-                                                        if (! input || ! editor || ! editor.editor) {
-                                                            return;
+                                                        if (! input || ! editor) {
+                                                            return false;
                                                         }
 
                                                         if (input.value !== normalized) {
                                                             input.value = normalized;
                                                         }
 
-                                                        if (editor.value !== normalized) {
+                                                        if (! editor.editor) {
+                                                            return false;
+                                                        }
+
+                                                        const currentDocument = editor.editor.getDocument().toString().trim();
+
+                                                        if (editor.value !== normalized || (normalized !== '' && currentDocument === '')) {
                                                             editor.editor.loadHTML(normalized);
                                                         }
+
+                                                        return true;
+                                                    },
+                                                    queueSync(attempt = 0) {
+                                                        const hydrated = this.syncEditor();
+
+                                                        if (hydrated || attempt >= 20) {
+                                                            return;
+                                                        }
+
+                                                        setTimeout(() => this.queueSync(attempt + 1), 50);
                                                     },
                                                     init() {
-                                                        this.$watch('value', () => this.syncEditor());
+                                                        const input = this.$refs.input;
+                                                        if (input && typeof input.value === 'string') {
+                                                            this.value = input.value;
+                                                        }
 
-                                                        this.$nextTick(() => this.syncEditor());
+                                                        this.$watch('value', () => this.queueSync());
+
+                                                        this.$nextTick(() => this.queueSync());
                                                     },
                                                 }"
                                                 class="rounded-md border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
@@ -653,7 +675,8 @@ new class extends Component
                                                 <trix-editor
                                                     x-ref="editor"
                                                     :input="trixInputId"
-                                                    x-on:trix-initialize="syncEditor()"
+                                                    x-on:trix-initialize="queueSync()"
+                                                    x-on:livewire:navigated.window="queueSync()"
                                                     x-on:trix-change="value = $event.target.value"
                                                     class="min-h-32 border-none bg-transparent px-3 py-2 text-sm text-zinc-900 outline-hidden ring-0 focus:ring-0 dark:text-zinc-100"
                                                     @if ($fieldRequired) required @endif
