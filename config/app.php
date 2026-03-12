@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'home_redirect' => env('HOME_REDIRECT'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
