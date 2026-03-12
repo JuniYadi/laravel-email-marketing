@@ -26,6 +26,21 @@ if (is_string($landingWildcardRoot) && $landingWildcardRoot !== '') {
 }
 
 Route::get('/', function () {
+    $homeRedirect = config('app.home_redirect');
+
+    if (is_string($homeRedirect)) {
+        $homeRedirect = trim($homeRedirect);
+        $isRelativeRedirect = str_starts_with($homeRedirect, '/') && ! str_starts_with($homeRedirect, '//');
+        $redirectScheme = parse_url($homeRedirect, PHP_URL_SCHEME);
+        $isAbsoluteRedirect = filter_var($homeRedirect, FILTER_VALIDATE_URL) !== false
+            && is_string($redirectScheme)
+            && in_array(strtolower($redirectScheme), ['http', 'https'], true);
+
+        if ($homeRedirect !== '' && ($isRelativeRedirect || $isAbsoluteRedirect)) {
+            return view('home-redirect', ['redirectUrl' => $homeRedirect]);
+        }
+    }
+
     return view('welcome');
 })->name('home');
 
