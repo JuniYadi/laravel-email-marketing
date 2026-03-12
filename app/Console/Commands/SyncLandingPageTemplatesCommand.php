@@ -84,7 +84,8 @@ class SyncLandingPageTemplatesCommand extends Command
                     foreach ($pages as $page) {
                         $currentSnapshot = is_array($page->template_snapshot) ? $page->template_snapshot : [];
                         $currentFormData = is_array($page->form_data) ? $page->form_data : [];
-                        $filteredFormData = collect($currentFormData)->only($allowedKeys)->all();
+                        $migratedFormData = $this->migrateLegacyFormData((string) $snapshot['key'], $currentFormData);
+                        $filteredFormData = collect($migratedFormData)->only($allowedKeys)->all();
 
                         if ($currentSnapshot === $snapshot && $currentFormData === $filteredFormData) {
                             continue;
@@ -101,5 +102,64 @@ class SyncLandingPageTemplatesCommand extends Command
         }
 
         return $updated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $formData
+     * @return array<string, mixed>
+     */
+    protected function migrateLegacyFormData(string $templateKey, array $formData): array
+    {
+        if ($templateKey !== 'template-event') {
+            return $formData;
+        }
+
+        if (isset($formData['cards']) && is_array($formData['cards']) && count($formData['cards']) > 0) {
+            return $formData;
+        }
+
+        $cards = [];
+
+        for ($index = 1; $index <= 6; $index++) {
+            $title = trim((string) ($formData['card_'.$index.'_title'] ?? ''));
+            $content = (string) ($formData['card_'.$index.'_content'] ?? '');
+            $hasContent = trim(strip_tags($content)) !== '';
+
+            if ($title === '' && ! $hasContent) {
+                continue;
+            }
+
+            $cards[] = [
+                'order' => $index,
+                'title' => $title === '' ? 'Section '.$index : $title,
+                'content' => $content,
+            ];
+        }
+
+        if ($cards === []) {
+            $legacyCards = [
+                ['title' => 'Program Description', 'content' => (string) ($formData['program_description'] ?? '')],
+                ['title' => "Event's Format", 'content' => (string) ($formData['event_format_details'] ?? '')],
+                ['title' => 'Modules', 'content' => (string) ($formData['modules_list'] ?? '')],
+            ];
+
+            foreach ($legacyCards as $legacyIndex => $legacyCard) {
+                if (trim(strip_tags($legacyCard['content'])) === '') {
+                    continue;
+                }
+
+                $cards[] = [
+                    'order' => $legacyIndex + 1,
+                    'title' => $legacyCard['title'],
+                    'content' => $legacyCard['content'],
+                ];
+            }
+        }
+
+        if ($cards !== []) {
+            $formData['cards'] = $cards;
+        }
+
+        return $formData;
     }
 }

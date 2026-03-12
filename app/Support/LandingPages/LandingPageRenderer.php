@@ -52,56 +52,105 @@ class LandingPageRenderer
             }
 
             $key = (string) ($field['key'] ?? '');
-            $type = (string) ($field['type'] ?? 'text');
 
             if ($key === '') {
                 continue;
             }
 
             $value = $formData[$key] ?? ($field['default'] ?? null);
-
-            if (in_array($type, ['text', 'textarea', 'select'], true)) {
-                $safeData[$key] = is_scalar($value) ? strip_tags((string) $value) : '';
-
-                continue;
-            }
-
-            if ($type === 'richtext') {
-                $safeData[$key] = is_scalar($value)
-                    ? $this->sanitizeRichText((string) $value)
-                    : '';
-
-                continue;
-            }
-
-            if ($type === 'color') {
-                $candidate = is_scalar($value) ? (string) $value : '';
-                $safeData[$key] = preg_match('/^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/', $candidate) === 1
-                    ? $candidate
-                    : '#111827';
-
-                continue;
-            }
-
-            if (in_array($type, ['image_url', 'url'], true)) {
-                $candidate = is_scalar($value) ? (string) $value : '';
-                $safeData[$key] = filter_var($candidate, FILTER_VALIDATE_URL) !== false ? $candidate : '';
-
-                continue;
-            }
-
-            if ($type === 'number') {
-                $safeData[$key] = is_numeric($value) ? $value + 0 : 0;
-
-                continue;
-            }
-
-            if ($type === 'toggle') {
-                $safeData[$key] = (bool) $value;
-            }
+            $safeData[$key] = $this->sanitizeFieldValue($field, $value);
         }
 
         return $safeData;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     */
+    protected function sanitizeFieldValue(array $field, mixed $value): mixed
+    {
+        $type = (string) ($field['type'] ?? 'text');
+
+        if (in_array($type, ['text', 'textarea', 'select'], true)) {
+            return is_scalar($value) ? strip_tags((string) $value) : '';
+        }
+
+        if ($type === 'richtext') {
+            return is_scalar($value)
+                ? $this->sanitizeRichText((string) $value)
+                : '';
+        }
+
+        if ($type === 'color') {
+            $candidate = is_scalar($value) ? (string) $value : '';
+
+            return preg_match('/^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/', $candidate) === 1
+                ? $candidate
+                : '#111827';
+        }
+
+        if (in_array($type, ['image_url', 'url'], true)) {
+            $candidate = is_scalar($value) ? (string) $value : '';
+
+            return filter_var($candidate, FILTER_VALIDATE_URL) !== false ? $candidate : '';
+        }
+
+        if ($type === 'number') {
+            return is_numeric($value) ? $value + 0 : 0;
+        }
+
+        if ($type === 'toggle') {
+            return (bool) $value;
+        }
+
+        if ($type === 'repeater') {
+            return $this->sanitizeRepeaterValue($field, $value);
+        }
+
+        return is_scalar($value) ? strip_tags((string) $value) : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return list<array<string, mixed>>
+     */
+    protected function sanitizeRepeaterValue(array $field, mixed $value): array
+    {
+        $items = is_array($value) ? array_values($value) : [];
+        $nestedFields = $field['fields'] ?? [];
+
+        if (! is_array($nestedFields) || $nestedFields === []) {
+            return [];
+        }
+
+        $sanitizedItems = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $sanitizedItem = [];
+
+            foreach ($nestedFields as $nestedField) {
+                if (! is_array($nestedField)) {
+                    continue;
+                }
+
+                $nestedKey = (string) ($nestedField['key'] ?? '');
+
+                if ($nestedKey === '') {
+                    continue;
+                }
+
+                $nestedValue = $item[$nestedKey] ?? ($nestedField['default'] ?? null);
+                $sanitizedItem[$nestedKey] = $this->sanitizeFieldValue($nestedField, $nestedValue);
+            }
+
+            $sanitizedItems[] = $sanitizedItem;
+        }
+
+        return $sanitizedItems;
     }
 
     protected function sanitizeRichText(string $value): string

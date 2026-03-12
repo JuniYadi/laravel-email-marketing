@@ -109,3 +109,31 @@ it('hydrates stored richtext value when opening landing page edit', function () 
         ->assertSet('formData.program_description', '<p><strong>Stored rich text</strong> value</p>')
         ->assertSee('&lt;p&gt;&lt;strong&gt;Stored rich text&lt;/strong&gt; value&lt;/p&gt;', false);
 });
+
+it('sanitizes repeater nested field values in landing page renderer', function () {
+    $renderer = app(LandingPageRenderer::class);
+    $method = new \ReflectionMethod(LandingPageRenderer::class, 'sanitizeFieldValue');
+    $method->setAccessible(true);
+
+    $sanitized = $method->invoke($renderer, [
+        'key' => 'cards',
+        'type' => 'repeater',
+        'fields' => [
+            ['key' => 'order', 'type' => 'number', 'default' => 1],
+            ['key' => 'title', 'type' => 'text', 'default' => ''],
+            ['key' => 'content', 'type' => 'richtext', 'default' => ''],
+        ],
+    ], [
+        [
+            'order' => '2',
+            'title' => '<strong>Unsafe Title</strong>',
+            'content' => '<p><a href="javascript:alert(1)">Bad Link</a> <a href="https://example.com">Safe Link</a></p>',
+        ],
+    ]);
+
+    expect($sanitized)->toBeArray()
+        ->and($sanitized[0]['order'])->toBe(2)
+        ->and($sanitized[0]['title'])->toBe('Unsafe Title')
+        ->and($sanitized[0]['content'])->toContain('Safe Link')
+        ->and($sanitized[0]['content'])->not->toContain('javascript:alert(1)');
+});

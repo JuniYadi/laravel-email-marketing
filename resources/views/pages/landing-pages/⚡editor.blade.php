@@ -144,6 +144,42 @@ new class extends Component
         $this->previewViewport = $viewport;
     }
 
+    public function addRepeaterItem(string $fieldKey): void
+    {
+        $field = $this->resolveFieldDefinition($fieldKey);
+
+        if ($field === null || (string) ($field['type'] ?? '') !== 'repeater') {
+            return;
+        }
+
+        $items = $this->formData[$fieldKey] ?? [];
+
+        if (! is_array($items)) {
+            $items = [];
+        }
+
+        $items[] = $this->repeaterItemDefaults($field);
+        $this->formData[$fieldKey] = array_values($items);
+    }
+
+    public function removeRepeaterItem(string $fieldKey, int $index): void
+    {
+        $field = $this->resolveFieldDefinition($fieldKey);
+
+        if ($field === null || (string) ($field['type'] ?? '') !== 'repeater') {
+            return;
+        }
+
+        $items = $this->formData[$fieldKey] ?? [];
+
+        if (! is_array($items) || ! array_key_exists($index, $items)) {
+            return;
+        }
+
+        unset($items[$index]);
+        $this->formData[$fieldKey] = array_values($items);
+    }
+
     #[Computed]
     public function templates(): Collection
     {
@@ -254,6 +290,81 @@ new class extends Component
             $fieldRules = [];
 
             $fieldRules[] = (bool) ($field['required'] ?? false) ? 'required' : 'nullable';
+
+            if ($type === 'repeater') {
+                $fieldRules[] = 'array';
+                $rules[$path] = $fieldRules;
+
+                $nestedFields = $field['fields'] ?? [];
+
+                if (! is_array($nestedFields)) {
+                    continue;
+                }
+
+                foreach ($nestedFields as $nestedField) {
+                    if (! is_array($nestedField)) {
+                        continue;
+                    }
+
+                    $nestedKey = (string) ($nestedField['key'] ?? '');
+                    $nestedType = (string) ($nestedField['type'] ?? 'text');
+
+                    if ($nestedKey === '' || $nestedType === 'repeater') {
+                        continue;
+                    }
+
+                    $nestedPath = $path.'.*.'.$nestedKey;
+                    $nestedRules = [];
+                    $nestedRules[] = (bool) ($nestedField['required'] ?? false) ? 'required' : 'nullable';
+
+                    if (in_array($nestedType, ['text', 'textarea', 'richtext'], true)) {
+                        $nestedRules[] = 'string';
+
+                        if (isset($nestedField['max']) && is_numeric($nestedField['max'])) {
+                            $nestedRules[] = 'max:'.(int) $nestedField['max'];
+                        }
+                    }
+
+                    if ($nestedType === 'color') {
+                        $nestedRules[] = 'regex:/^#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/';
+                    }
+
+                    if (in_array($nestedType, ['image_url', 'url'], true)) {
+                        $nestedRules[] = 'url';
+                        $nestedRules[] = 'max:2048';
+                    }
+
+                    if ($nestedType === 'number') {
+                        $nestedRules[] = 'numeric';
+
+                        if (isset($nestedField['min']) && is_numeric($nestedField['min'])) {
+                            $nestedRules[] = 'min:'.$nestedField['min'];
+                        }
+
+                        if (isset($nestedField['max']) && is_numeric($nestedField['max'])) {
+                            $nestedRules[] = 'max:'.$nestedField['max'];
+                        }
+                    }
+
+                    if ($nestedType === 'select') {
+                        $allowedValues = collect($nestedField['options'] ?? [])
+                            ->map(fn (mixed $option): string => is_array($option) ? (string) ($option['value'] ?? '') : (string) $option)
+                            ->filter()
+                            ->values()
+                            ->all();
+
+                        $nestedRules[] = Rule::in($allowedValues);
+                    }
+
+                    if ($nestedType === 'toggle') {
+                        $nestedRules[] = 'boolean';
+                    }
+
+                    $rules[$nestedPath] = $nestedRules;
+                }
+
+                continue;
+            }
 
             if (in_array($type, ['text', 'textarea', 'richtext'], true)) {
                 $fieldRules[] = 'string';
@@ -412,13 +523,17 @@ new class extends Component
             }
 
             if (array_key_exists($key, $current)) {
-                $normalized[$key] = $current[$key];
+                $normalized[$key] = $type === 'repeater'
+                    ? $this->normalizeRepeaterValueFromSchema($field, $current[$key])
+                    : $current[$key];
 
                 continue;
             }
 
             if (array_key_exists('default', $field)) {
-                $normalized[$key] = $field['default'];
+                $normalized[$key] = $type === 'repeater'
+                    ? $this->normalizeRepeaterValueFromSchema($field, $field['default'])
+                    : $field['default'];
 
                 continue;
             }
@@ -427,11 +542,141 @@ new class extends Component
                 'number' => 0,
                 'toggle' => false,
                 'color' => '#111827',
+                'repeater' => [],
                 default => '',
             };
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>|null
+     */
+    protected function resolveFieldDefinition(string $fieldKey): ?array
+    {
+        foreach ($this->fieldDefinitions as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            if ((string) ($field['key'] ?? '') === $fieldKey) {
+                return $field;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return array<string, mixed>
+     */
+    protected function repeaterItemDefaults(array $field): array
+    {
+        $defaults = [];
+        $nestedFields = $field['fields'] ?? [];
+
+        if (! is_array($nestedFields)) {
+            return $defaults;
+        }
+
+        foreach ($nestedFields as $nestedField) {
+            if (! is_array($nestedField)) {
+                continue;
+            }
+
+            $nestedKey = (string) ($nestedField['key'] ?? '');
+            $nestedType = (string) ($nestedField['type'] ?? 'text');
+
+            if ($nestedKey === '') {
+                continue;
+            }
+
+            if (array_key_exists('default', $nestedField)) {
+                $defaults[$nestedKey] = $nestedType === 'repeater'
+                    ? $this->normalizeRepeaterValueFromSchema($nestedField, $nestedField['default'])
+                    : $nestedField['default'];
+
+                continue;
+            }
+
+            $defaults[$nestedKey] = match ($nestedType) {
+                'number' => 0,
+                'toggle' => false,
+                'color' => '#111827',
+                'repeater' => [],
+                default => '',
+            };
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return list<array<string, mixed>>
+     */
+    protected function normalizeRepeaterValueFromSchema(array $field, mixed $value): array
+    {
+        $items = is_array($value) ? array_values($value) : [];
+        $nestedFields = $field['fields'] ?? [];
+
+        if (! is_array($nestedFields)) {
+            return [];
+        }
+
+        $normalizedItems = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $normalizedItem = [];
+
+            foreach ($nestedFields as $nestedField) {
+                if (! is_array($nestedField)) {
+                    continue;
+                }
+
+                $nestedKey = (string) ($nestedField['key'] ?? '');
+                $nestedType = (string) ($nestedField['type'] ?? 'text');
+
+                if ($nestedKey === '') {
+                    continue;
+                }
+
+                if (array_key_exists($nestedKey, $item)) {
+                    $normalizedItem[$nestedKey] = $nestedType === 'repeater'
+                        ? $this->normalizeRepeaterValueFromSchema($nestedField, $item[$nestedKey])
+                        : $item[$nestedKey];
+
+                    continue;
+                }
+
+                if (array_key_exists('default', $nestedField)) {
+                    $normalizedItem[$nestedKey] = $nestedType === 'repeater'
+                        ? $this->normalizeRepeaterValueFromSchema($nestedField, $nestedField['default'])
+                        : $nestedField['default'];
+
+                    continue;
+                }
+
+                $normalizedItem[$nestedKey] = match ($nestedType) {
+                    'number' => 0,
+                    'toggle' => false,
+                    'color' => '#111827',
+                    'repeater' => [],
+                    default => '',
+                };
+            }
+
+            $normalizedItems[] = $normalizedItem;
+        }
+
+        return $normalizedItems;
     }
 
     protected function resolveLandingPage(LandingPage|int|string|null $landingPage): ?LandingPage
@@ -681,6 +926,192 @@ new class extends Component
                                                     class="min-h-32 border-none bg-transparent px-3 py-2 text-sm text-zinc-900 outline-hidden ring-0 focus:ring-0 dark:text-zinc-100"
                                                     @if ($fieldRequired) required @endif
                                                 ></trix-editor>
+                                            </div>
+                                        </flux:field>
+                                    @elseif ($fieldType === 'repeater')
+                                        @php
+                                            $repeaterFields = is_array($field['fields'] ?? null) ? $field['fields'] : [];
+                                            $repeaterItemsRaw = $formData[$fieldKey] ?? [];
+                                            $repeaterItems = is_array($repeaterItemsRaw) ? array_values($repeaterItemsRaw) : [];
+                                        @endphp
+
+                                        <flux:field>
+                                            <div class="flex items-center justify-between gap-3">
+                                                <flux:label>{{ $fieldLabel }}</flux:label>
+                                                <flux:button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    wire:click="addRepeaterItem('{{ $fieldKey }}')"
+                                                >
+                                                    {{ __('Add Item') }}
+                                                </flux:button>
+                                            </div>
+
+                                            <div class="mt-3 space-y-4">
+                                                @forelse ($repeaterItems as $itemIndex => $item)
+                                                    <div
+                                                        wire:key="landing-page-template-{{ $selectedTemplateId ?? 'none' }}-repeater-{{ $fieldKey }}-{{ $itemIndex }}"
+                                                        class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700"
+                                                    >
+                                                        <div class="mb-3 flex items-center justify-between">
+                                                            <flux:text class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                                                                {{ __('Item :number', ['number' => $itemIndex + 1]) }}
+                                                            </flux:text>
+                                                            <flux:button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                wire:click="removeRepeaterItem('{{ $fieldKey }}', {{ $itemIndex }})"
+                                                            >
+                                                                {{ __('Remove') }}
+                                                            </flux:button>
+                                                        </div>
+
+                                                        <div class="space-y-3">
+                                                            @foreach ($repeaterFields as $nestedFieldIndex => $nestedField)
+                                                                @php
+                                                                    $nestedKey = (string) ($nestedField['key'] ?? '');
+                                                                    $nestedType = (string) ($nestedField['type'] ?? 'text');
+                                                                    $nestedLabel = (string) ($nestedField['label'] ?? $nestedKey);
+                                                                    $nestedRequired = (bool) ($nestedField['required'] ?? false);
+                                                                    $nestedModel = 'formData.'.$fieldKey.'.'.$itemIndex.'.'.$nestedKey;
+                                                                @endphp
+
+                                                                @if ($nestedKey === '')
+                                                                    @continue
+                                                                @endif
+
+                                                                @if ($nestedType === 'richtext')
+                                                                    <flux:field>
+                                                                        <flux:label>{{ $nestedLabel }}</flux:label>
+                                                                        <div
+                                                                            wire:ignore
+                                                                            x-data="{
+                                                                                trixInputId: 'landing-page-richtext-repeater-{{ $selectedTemplateId ?? 'none' }}-{{ $fieldKey }}-{{ $itemIndex }}-{{ $nestedKey }}-{{ $nestedFieldIndex }}',
+                                                                                value: @entangle($nestedModel).live,
+                                                                                syncEditor() {
+                                                                                    const normalized = this.value ?? '';
+                                                                                    const input = this.$refs.input;
+                                                                                    const editor = this.$refs.editor;
+
+                                                                                    if (! input || ! editor) {
+                                                                                        return false;
+                                                                                    }
+
+                                                                                    if (input.value !== normalized) {
+                                                                                        input.value = normalized;
+                                                                                    }
+
+                                                                                    if (! editor.editor) {
+                                                                                        return false;
+                                                                                    }
+
+                                                                                    const currentDocument = editor.editor.getDocument().toString().trim();
+
+                                                                                    if (editor.value !== normalized || (normalized !== '' && currentDocument === '')) {
+                                                                                        editor.editor.loadHTML(normalized);
+                                                                                    }
+
+                                                                                    return true;
+                                                                                },
+                                                                                queueSync(attempt = 0) {
+                                                                                    const hydrated = this.syncEditor();
+
+                                                                                    if (hydrated || attempt >= 20) {
+                                                                                        return;
+                                                                                    }
+
+                                                                                    setTimeout(() => this.queueSync(attempt + 1), 50);
+                                                                                },
+                                                                                init() {
+                                                                                    const input = this.$refs.input;
+                                                                                    if (input && typeof input.value === 'string') {
+                                                                                        this.value = input.value;
+                                                                                    }
+
+                                                                                    this.$watch('value', () => this.queueSync());
+
+                                                                                    this.$nextTick(() => this.queueSync());
+                                                                                },
+                                                                            }"
+                                                                            class="rounded-md border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                                                                        >
+                                                                            <input
+                                                                                x-ref="input"
+                                                                                :id="trixInputId"
+                                                                                type="hidden"
+                                                                                value="{{ (string) data_get($item, $nestedKey, '') }}"
+                                                                            >
+                                                                            <trix-editor
+                                                                                x-ref="editor"
+                                                                                :input="trixInputId"
+                                                                                x-on:trix-initialize="queueSync()"
+                                                                                x-on:livewire:navigated.window="queueSync()"
+                                                                                x-on:trix-change="value = $event.target.value"
+                                                                                class="min-h-32 border-none bg-transparent px-3 py-2 text-sm text-zinc-900 outline-hidden ring-0 focus:ring-0 dark:text-zinc-100"
+                                                                                @if ($nestedRequired) required @endif
+                                                                            ></trix-editor>
+                                                                        </div>
+                                                                    </flux:field>
+                                                                @elseif ($nestedType === 'textarea')
+                                                                    <flux:textarea
+                                                                        wire:model="{{ $nestedModel }}"
+                                                                        :label="$nestedLabel"
+                                                                        rows="4"
+                                                                        :required="$nestedRequired"
+                                                                    />
+                                                                @elseif ($nestedType === 'color')
+                                                                    <flux:input wire:model="{{ $nestedModel }}" :label="$nestedLabel" type="color" :required="$nestedRequired" />
+                                                                @elseif ($nestedType === 'image_url')
+                                                                    <x-forms.image-upload
+                                                                        :label="$nestedLabel"
+                                                                        :url-model="$nestedModel"
+                                                                        :current-url="(string) data_get($item, $nestedKey, '')"
+                                                                        :required="$nestedRequired"
+                                                                        :help-text="__('Paste a public image URL or upload an image to store it on S3.')"
+                                                                    />
+                                                                @elseif ($nestedType === 'url')
+                                                                    <flux:input wire:model="{{ $nestedModel }}" :label="$nestedLabel" type="url" :required="$nestedRequired" />
+                                                                @elseif ($nestedType === 'number')
+                                                                    <flux:input
+                                                                        wire:model="{{ $nestedModel }}"
+                                                                        :label="$nestedLabel"
+                                                                        type="number"
+                                                                        :min="isset($nestedField['min']) ? (string) $nestedField['min'] : null"
+                                                                        :max="isset($nestedField['max']) ? (string) $nestedField['max'] : null"
+                                                                        :required="$nestedRequired"
+                                                                    />
+                                                                @elseif ($nestedType === 'select')
+                                                                    <flux:field>
+                                                                        <flux:label>{{ $nestedLabel }}</flux:label>
+                                                                        <flux:select wire:model="{{ $nestedModel }}" :required="$nestedRequired">
+                                                                            <flux:select.option value="">{{ __('Choose option') }}</flux:select.option>
+                                                                            @foreach ((array) ($nestedField['options'] ?? []) as $option)
+                                                                                <flux:select.option value="{{ is_array($option) ? ($option['value'] ?? '') : $option }}">
+                                                                                    {{ is_array($option) ? ($option['label'] ?? $option['value'] ?? '') : $option }}
+                                                                                </flux:select.option>
+                                                                            @endforeach
+                                                                        </flux:select>
+                                                                    </flux:field>
+                                                                @elseif ($nestedType === 'toggle')
+                                                                    <flux:field>
+                                                                        <flux:label>{{ $nestedLabel }}</flux:label>
+                                                                        <flux:switch wire:model="{{ $nestedModel }}" />
+                                                                    </flux:field>
+                                                                @else
+                                                                    <flux:input wire:model="{{ $nestedModel }}" :label="$nestedLabel" type="text" :required="$nestedRequired" />
+                                                                @endif
+
+                                                                <flux:error name="formData.{{ $fieldKey }}.{{ $itemIndex }}.{{ $nestedKey }}" />
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                @empty
+                                                    <flux:text class="text-sm text-zinc-500">
+                                                        {{ __('No items yet. Click \"Add Item\" to create one.') }}
+                                                    </flux:text>
+                                                @endforelse
                                             </div>
                                         </flux:field>
                                     @elseif ($fieldType === 'textarea')

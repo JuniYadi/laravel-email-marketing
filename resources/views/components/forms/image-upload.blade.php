@@ -100,8 +100,8 @@
     </flux:field>
 
     @if (is_string($currentUrl) && $currentUrl !== '')
-        <div class="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950">
-            <img src="{{ $currentUrl }}" alt="{{ $label }}" class="h-40 w-full object-cover">
+        <div class="h-24 max-h-24 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950">
+            <img src="{{ $currentUrl }}" alt="{{ $label }}" class="h-full max-h-24 w-full object-contain" style="max-height: 96px;">
         </div>
 
         <div class="flex items-center justify-end">
