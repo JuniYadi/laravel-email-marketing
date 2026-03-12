@@ -616,17 +616,45 @@ new class extends Component
                                             <flux:label>{{ $fieldLabel }}</flux:label>
                                             <div
                                                 wire:ignore
-                                                x-data="{ trixInputId: 'landing-page-richtext-{{ $selectedTemplateId ?? 'none' }}-{{ $fieldKey }}-{{ $fieldIndex }}' }"
+                                                x-data="{
+                                                    trixInputId: 'landing-page-richtext-{{ $selectedTemplateId ?? 'none' }}-{{ $fieldKey }}-{{ $fieldIndex }}',
+                                                    value: @entangle('formData.'.$fieldKey).live,
+                                                    syncEditor() {
+                                                        const normalized = this.value ?? '';
+                                                        const input = this.$refs.input;
+                                                        const editor = this.$refs.editor;
+
+                                                        if (! input || ! editor || ! editor.editor) {
+                                                            return;
+                                                        }
+
+                                                        if (input.value !== normalized) {
+                                                            input.value = normalized;
+                                                        }
+
+                                                        if (editor.value !== normalized) {
+                                                            editor.editor.loadHTML(normalized);
+                                                        }
+                                                    },
+                                                    init() {
+                                                        this.$watch('value', () => this.syncEditor());
+
+                                                        this.$nextTick(() => this.syncEditor());
+                                                    },
+                                                }"
                                                 class="rounded-md border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
                                             >
                                                 <input
+                                                    x-ref="input"
                                                     :id="trixInputId"
                                                     type="hidden"
                                                     value="{{ (string) ($formData[$fieldKey] ?? '') }}"
                                                 >
                                                 <trix-editor
+                                                    x-ref="editor"
                                                     :input="trixInputId"
-                                                    x-on:trix-change="$wire.set('formData.{{ $fieldKey }}', $event.target.value)"
+                                                    x-on:trix-initialize="syncEditor()"
+                                                    x-on:trix-change="value = $event.target.value"
                                                     class="min-h-32 border-none bg-transparent px-3 py-2 text-sm text-zinc-900 outline-hidden ring-0 focus:ring-0 dark:text-zinc-100"
                                                     @if ($fieldRequired) required @endif
                                                 ></trix-editor>

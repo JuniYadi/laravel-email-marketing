@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Models\User;
 use App\Support\LandingPages\LandingPageRenderer;
@@ -74,4 +75,37 @@ it('renders a trix editor for richtext template fields in landing page editor', 
         ->set('selectedTemplateId', $template->id)
         ->assertSee('trix-editor', false)
         ->assertSee('x-on:trix-change', false);
+});
+
+it('hydrates stored richtext value when opening landing page edit', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $template = LandingPageTemplate::factory()->create([
+        'schema' => [
+            'fields' => [
+                ['key' => 'program_description', 'label' => 'Program Description', 'type' => 'richtext', 'required' => true],
+            ],
+        ],
+    ]);
+
+    $landingPage = LandingPage::factory()->create([
+        'user_id' => $user->id,
+        'landing_page_template_id' => $template->id,
+        'template_snapshot' => [
+            'key' => $template->key,
+            'name' => $template->name,
+            'description' => $template->description,
+            'view_path' => $template->view_path,
+            'version' => $template->version,
+            'schema' => is_array($template->schema) ? $template->schema : ['fields' => []],
+        ],
+        'form_data' => [
+            'program_description' => '<p><strong>Stored rich text</strong> value</p>',
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id])
+        ->assertSet('formData.program_description', '<p><strong>Stored rich text</strong> value</p>')
+        ->assertSee('&lt;p&gt;&lt;strong&gt;Stored rich text&lt;/strong&gt; value&lt;/p&gt;', false);
 });
