@@ -35,8 +35,11 @@
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.*')" wire:navigate>
+                    <flux:sidebar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.index') || request()->routeIs('landing-pages.create') || request()->routeIs('landing-pages.edit')" wire:navigate>
                         {{ __('Landing Pages') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clock" :href="route('landing-pages.history')" :current="request()->routeIs('landing-pages.history')" wire:navigate>
+                        {{ __('Landing Page History') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
