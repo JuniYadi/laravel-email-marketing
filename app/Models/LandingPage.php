@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LandingPage extends Model
 {
@@ -58,6 +59,14 @@ class LandingPage extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(LandingPageTemplate::class, 'landing_page_template_id');
+    }
+
+    /**
+     * @return HasMany<LandingPageView, $this>
+     */
+    public function viewEvents(): HasMany
+    {
+        return $this->hasMany(LandingPageView::class);
     }
 
     public function isPublished(): bool
