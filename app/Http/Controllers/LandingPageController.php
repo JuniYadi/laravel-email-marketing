@@ -5,17 +5,24 @@ namespace App\Http\Controllers;
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Support\LandingPages\LandingPageRenderer;
+use App\Support\Traffic\BotUserAgentDetector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 class LandingPageController extends Controller
 {
-    public function show(string $slug, LandingPageRenderer $renderer): View
-    {
+    public function show(
+        string $slug,
+        Request $request,
+        LandingPageRenderer $renderer,
+        BotUserAgentDetector $botUserAgentDetector,
+    ): View {
         $landingPage = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', LandingPage::STATUS_PUBLISHED)
             ->firstOrFail();
+
+        $this->trackGuestView($request, $landingPage, $botUserAgentDetector);
 
         return $this->renderLandingPage($landingPage, $renderer);
     }
@@ -76,6 +83,25 @@ class LandingPageController extends Controller
             'meta' => $meta,
             'html' => $html,
             'isStandaloneTemplate' => $isStandaloneTemplate,
+        ]);
+    }
+
+    protected function trackGuestView(
+        Request $request,
+        LandingPage $landingPage,
+        BotUserAgentDetector $botUserAgentDetector,
+    ): void {
+        if ($request->user() !== null) {
+            return;
+        }
+
+        $userAgent = $request->userAgent();
+
+        $landingPage->viewEvents()->create([
+            'ip_address' => (string) $request->ip(),
+            'user_agent' => $userAgent,
+            'is_bot' => $botUserAgentDetector->isBot($userAgent),
+            'viewed_at' => now(),
         ]);
     }
 }
