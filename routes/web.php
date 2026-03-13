@@ -69,6 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('templates/create', BuilderPage::class)->name('templates.create');
     Route::livewire('templates/{template}/edit', BuilderPage::class)->name('templates.edit');
     Route::livewire('landing-pages', 'pages::landing-pages.index')->name('landing-pages.index');
+    Route::livewire('landing-pages/history', 'pages::landing-pages.history')->name('landing-pages.history');
     Route::livewire('landing-pages/create', 'pages::landing-pages.editor')->name('landing-pages.create');
     Route::livewire('landing-pages/{landingPage}/edit', 'pages::landing-pages.editor')->name('landing-pages.edit');
 

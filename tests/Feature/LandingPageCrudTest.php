@@ -163,6 +163,21 @@ it('shows landing pages from all users in index', function () {
         ->assertSeeText('Owner B');
 });
 
+it('shows compact landing page actions with open page button and no slug column', function () {
+    $viewer = User::factory()->create();
+
+    LandingPage::factory()->published()->create([
+        'title' => 'Public Launch Page',
+        'slug' => 'public-launch-page',
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('landing-pages.index'))
+        ->assertOk()
+        ->assertSeeText('Open Page')
+        ->assertDontSeeText('Slug');
+});
+
 it('allows editing landing pages created by another user', function () {
     $editor = User::factory()->create();
     $owner = User::factory()->create();

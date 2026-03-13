@@ -48,11 +48,28 @@ new class extends Component {
         session()->flash('landing_pages_notice_type', 'success');
     }
 
+    public function publicPageUrl(LandingPage $landingPage): string
+    {
+        if (filled($landingPage->custom_domain)) {
+            return 'https://'.$landingPage->custom_domain;
+        }
+
+        return route('events.show', $landingPage->slug);
+    }
+
     #[Computed]
     public function landingPages(): Collection
     {
         return LandingPage::query()
             ->with('user:id,name,email')
+            ->withCount([
+                'viewEvents as real_views_count' => function ($query): void {
+                    $query->where('is_bot', false);
+                },
+                'viewEvents as bot_views_count' => function ($query): void {
+                    $query->where('is_bot', true);
+                },
+            ])
             ->latest('updated_at')
             ->get();
     }
@@ -96,8 +113,9 @@ new class extends Component {
                             <th class="py-2 pe-3">{{ __('Title') }}</th>
                             <th class="py-2 pe-3">{{ __('Owner') }}</th>
                             <th class="py-2 pe-3">{{ __('Template') }}</th>
-                            <th class="py-2 pe-3">{{ __('Slug') }}</th>
                             <th class="py-2 pe-3">{{ __('Status') }}</th>
+                            <th class="py-2 pe-3">{{ __('Views') }}</th>
+                            <th class="py-2 pe-3">{{ __('Bot Views') }}</th>
                             <th class="py-2 pe-3">{{ __('Updated') }}</th>
                             <th class="py-2">{{ __('Actions') }}</th>
                         </tr>
@@ -111,45 +129,50 @@ new class extends Component {
                                 </td>
                                 <td class="py-2 pe-3">{{ $landingPage->template_snapshot['name'] ?? 'Template' }}</td>
                                 <td class="py-2 pe-3">
-                                    @if (filled($landingPage->custom_domain))
-                                        <a href="https://{{ $landingPage->custom_domain }}" class="text-sky-600 underline" target="_blank" rel="noreferrer">
-                                            {{ $landingPage->custom_domain }}
-                                        </a>
-                                    @else
-                                        <a href="{{ route('events.show', $landingPage->slug) }}" class="text-sky-600 underline" target="_blank" rel="noreferrer">
-                                            /events/{{ $landingPage->slug }}
-                                        </a>
-                                    @endif
-                                </td>
-                                <td class="py-2 pe-3">
                                     @if ($landingPage->status === \App\Models\LandingPage::STATUS_PUBLISHED)
                                         <flux:badge color="emerald" size="sm">{{ __('Published') }}</flux:badge>
                                     @else
                                         <flux:badge size="sm">{{ __('Draft') }}</flux:badge>
                                     @endif
                                 </td>
+                                <td class="py-2 pe-3">{{ (int) $landingPage->real_views_count }}</td>
+                                <td class="py-2 pe-3">{{ (int) $landingPage->bot_views_count }}</td>
                                 <td class="py-2 pe-3">{{ $landingPage->updated_at?->diffForHumans() }}</td>
                                 <td class="py-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <flux:button :href="route('landing-pages.edit', $landingPage)" size="sm" variant="ghost" wire:navigate>
-                                            {{ __('Edit') }}
-                                        </flux:button>
+                                    <flux:dropdown position="bottom" align="end">
+                                        <flux:button variant="ghost" size="sm" icon="ellipsis-horizontal" />
 
-                                        @if ($landingPage->status === \App\Models\LandingPage::STATUS_DRAFT)
-                                            <flux:button wire:click="publishPage({{ $landingPage->id }})" size="sm" variant="filled">
-                                                {{ __('Publish') }}
-                                            </flux:button>
-                                        @else
-                                            <flux:button wire:click="unpublishPage({{ $landingPage->id }})" size="sm" variant="ghost">
-                                                {{ __('Unpublish') }}
-                                            </flux:button>
-                                        @endif
-                                    </div>
+                                        <flux:menu>
+                                            <flux:menu.item :href="$this->publicPageUrl($landingPage)" icon="arrow-top-right-on-square" target="_blank" rel="noreferrer">
+                                                {{ __('Open Page') }}
+                                            </flux:menu.item>
+
+                                            <flux:menu.item :href="route('landing-pages.edit', $landingPage)" icon="pencil" wire:navigate>
+                                                {{ __('Edit') }}
+                                            </flux:menu.item>
+
+                                            <flux:menu.item :href="route('landing-pages.history', ['landing_page_id' => $landingPage->id])" icon="clock" wire:navigate>
+                                                {{ __('History') }}
+                                            </flux:menu.item>
+
+                                            <flux:menu.separator />
+
+                                            @if ($landingPage->status === \App\Models\LandingPage::STATUS_DRAFT)
+                                                <flux:menu.item wire:click="publishPage({{ $landingPage->id }})" icon="bolt">
+                                                    {{ __('Publish') }}
+                                                </flux:menu.item>
+                                            @else
+                                                <flux:menu.item wire:click="unpublishPage({{ $landingPage->id }})" icon="x-mark">
+                                                    {{ __('Unpublish') }}
+                                                </flux:menu.item>
+                                            @endif
+                                        </flux:menu>
+                                    </flux:dropdown>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td class="py-4" colspan="7">
+                                <td class="py-4" colspan="8">
                                     <flux:text>{{ __('No landing pages yet.') }}</flux:text>
                                 </td>
                             </tr>

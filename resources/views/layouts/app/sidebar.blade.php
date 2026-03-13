@@ -11,7 +11,7 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
+                <flux:sidebar.group :heading="__('Email Broadcast')" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
@@ -35,8 +35,14 @@
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.*')" wire:navigate>
+                </flux:sidebar.group>
+
+                <flux:sidebar.group :heading="__('Landing Page')" class="grid">
+                    <flux:sidebar.item icon="presentation-chart-line" :href="route('landing-pages.index')" :current="request()->routeIs('landing-pages.index') || request()->routeIs('landing-pages.create') || request()->routeIs('landing-pages.edit')" wire:navigate>
                         {{ __('Landing Pages') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="clock" :href="route('landing-pages.history')" :current="request()->routeIs('landing-pages.history')" wire:navigate>
+                        {{ __('Landing Page History') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
