@@ -6,6 +6,7 @@ use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Support\LandingPages\LandingPageRenderer;
 use App\Support\Traffic\BotUserAgentDetector;
+use App\Support\Traffic\ClientIpResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -16,13 +17,14 @@ class LandingPageController extends Controller
         Request $request,
         LandingPageRenderer $renderer,
         BotUserAgentDetector $botUserAgentDetector,
+        ClientIpResolver $clientIpResolver,
     ): View {
         $landingPage = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', LandingPage::STATUS_PUBLISHED)
             ->firstOrFail();
 
-        $this->trackGuestView($request, $landingPage, $botUserAgentDetector);
+        $this->trackGuestView($request, $landingPage, $botUserAgentDetector, $clientIpResolver);
 
         return $this->renderLandingPage($landingPage, $renderer);
     }
@@ -90,6 +92,7 @@ class LandingPageController extends Controller
         Request $request,
         LandingPage $landingPage,
         BotUserAgentDetector $botUserAgentDetector,
+        ClientIpResolver $clientIpResolver,
     ): void {
         if ($request->user() !== null) {
             return;
@@ -98,7 +101,7 @@ class LandingPageController extends Controller
         $userAgent = $request->userAgent();
 
         $landingPage->viewEvents()->create([
-            'ip_address' => (string) $request->ip(),
+            'ip_address' => $clientIpResolver->resolve($request),
             'user_agent' => $userAgent,
             'is_bot' => $botUserAgentDetector->isBot($userAgent),
             'viewed_at' => now(),
