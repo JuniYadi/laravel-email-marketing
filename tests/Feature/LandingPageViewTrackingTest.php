@@ -53,6 +53,26 @@ it('logs bot access but flags it as bot traffic', function () {
     ]);
 });
 
+it('prefers public forwarded client ip when proxy and forwarded headers are present', function () {
+    $landingPage = LandingPage::factory()->published()->create([
+        'slug' => 'proxy-forwarded-client-ip',
+    ]);
+
+    $this->withHeaders([
+        'User-Agent' => 'Mozilla/5.0',
+        'X-Forwarded-For' => '10.0.250.122, 198.51.100.77',
+    ])->withServerVariables([
+        'REMOTE_ADDR' => '10.0.250.122',
+    ])->get(route('events.show', $landingPage->slug))
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('landing_page_views', [
+        'landing_page_id' => $landingPage->id,
+        'ip_address' => '198.51.100.77',
+        'is_bot' => 0,
+    ]);
+});
+
 it('logs every guest hit without deduplication', function () {
     $landingPage = LandingPage::factory()->published()->create([
         'slug' => 'guest-multi-hit',
