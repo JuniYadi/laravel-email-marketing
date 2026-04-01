@@ -4,16 +4,19 @@ use App\Models\Contact;
 use App\Models\ContactGroup;
 use App\Support\Contacts\ContactVariableRegistry;
 use App\Support\CsvUploadedFileReader;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
     use WithFileUploads;
+    use WithPagination;
 
     // Group properties
     public string $groupName = '';
@@ -50,6 +53,9 @@ new class extends Component
 
     // Tab state
     public string $activeTab = 'contacts';
+
+    // Pagination
+    public int $perPage = 25;
 
     /**
      * Open create group modal.
@@ -555,20 +561,45 @@ new class extends Component
         ]);
     }
 
-    #[Computed]
-    public function groups(): Collection
+    public function updated(string $property): void
     {
-        return ContactGroup::query()->with('contacts')->orderBy('id')->get();
+        if (! in_array($this->perPage, [10, 25, 50, 100], true)) {
+            $this->perPage = 25;
+        }
+
+        if (in_array($property, ['activeTab', 'perPage'], true)) {
+            $this->resetPage();
+        }
     }
 
     #[Computed]
-    public function contacts(): Collection
+    public function allGroups(): Collection
+    {
+        return ContactGroup::query()->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function groups(): LengthAwarePaginator
+    {
+        return ContactGroup::query()
+            ->withCount('contacts')
+            ->latest('id')
+            ->paginate($this->perPage);
+    }
+
+    #[Computed]
+    public function contacts(): LengthAwarePaginator
     {
         return Contact::query()
-            ->with('groups')
-            ->latest()
-            ->limit(25)
-            ->get();
+            ->with('groups:id,name')
+            ->latest('id')
+            ->paginate($this->perPage);
+    }
+
+    #[Computed]
+    public function groupCount(): int
+    {
+        return ContactGroup::query()->count();
     }
 
     #[Computed]
@@ -615,6 +646,18 @@ new class extends Component
             @endif
         </div>
 
+        <div class="flex items-center justify-end">
+            <flux:field class="w-32">
+                <flux:label>{{ __('Per page') }}</flux:label>
+                <flux:select wire:model.live="perPage">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </flux:select>
+            </flux:field>
+        </div>
+
         <!-- Tabs Navigation -->
         <div class="flex items-center gap-4 border-b border-zinc-200 dark:border-zinc-700">
             <button
@@ -637,7 +680,7 @@ new class extends Component
                 <div class="grid gap-4 md:grid-cols-3">
                     <div>
                         <flux:text>{{ __('Total Groups') }}</flux:text>
-                        <flux:heading size="lg">{{ $this->groups->count() }}</flux:heading>
+                        <flux:heading size="lg">{{ $this->groupCount }}</flux:heading>
                     </div>
                     <div>
                         <flux:text>{{ __('Imported Contacts') }}</flux:text>
@@ -703,6 +746,10 @@ new class extends Component
                         </tbody>
                     </table>
                 </div>
+
+                <div class="mt-4">
+                    <flux:pagination :paginator="$this->contacts" />
+                </div>
             </div>
         @else
             <!-- Groups Tab -->
@@ -714,7 +761,7 @@ new class extends Component
                     </flux:button>
                 </div>
 
-                @if ($this->groups->isNotEmpty())
+                @if ($this->groups->count() > 0)
                     <div class="mt-4 overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead>
@@ -732,7 +779,7 @@ new class extends Component
                                                 {{ $group->name }}
                                             </flux:link>
                                         </td>
-                                        <td class="py-2 pe-3">{{ $group->contacts->count() }}</td>
+                                        <td class="py-2 pe-3">{{ $group->contacts_count }}</td>
                                         <td class="py-2">
                                             <flux:button :href="route('contacts.groups.show', $group)" size="sm" variant="ghost" wire:navigate>
                                                 {{ __('View') }}
@@ -742,6 +789,10 @@ new class extends Component
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="mt-4">
+                        <flux:pagination :paginator="$this->groups" />
                     </div>
                 @else
                     <flux:text class="mt-4">{{ __('No groups yet. Create your first group to get started.') }}</flux:text>
@@ -803,10 +854,10 @@ new class extends Component
                     @enderror
                 </div>
 
-                @if ($this->groups->isNotEmpty())
+                @if ($this->allGroups->isNotEmpty())
                     <div class="space-y-2">
                         <flux:text>{{ __('Assign imported contacts to groups (optional)') }}</flux:text>
-                        @foreach ($this->groups as $group)
+                        @foreach ($this->allGroups as $group)
                             <flux:checkbox
                                 wire:key="import-group-{{ $group->id }}"
                                 wire:model="selectedGroupIds"
@@ -840,10 +891,10 @@ new class extends Component
                 <flux:input wire:model="contactLastName" :label="__('Last Name')" type="text" required />
                 <flux:input wire:model="contactCompany" :label="__('Company')" type="text" />
 
-                @if ($this->groups->isNotEmpty())
+                @if ($this->allGroups->isNotEmpty())
                     <div class="space-y-2">
                         <flux:text>{{ __('Assign to groups (optional)') }}</flux:text>
-                        @foreach ($this->groups as $group)
+                        @foreach ($this->allGroups as $group)
                             <flux:checkbox
                                 wire:key="contact-group-{{ $group->id }}"
                                 wire:model="contactGroupIds"
@@ -877,10 +928,10 @@ new class extends Component
                 <flux:input wire:model="editContactLastName" :label="__('Last Name')" type="text" required />
                 <flux:input wire:model="editContactCompany" :label="__('Company')" type="text" />
 
-                @if ($this->groups->isNotEmpty())
+                @if ($this->allGroups->isNotEmpty())
                     <div class="space-y-2">
                         <flux:text>{{ __('Assign to groups (optional)') }}</flux:text>
-                        @foreach ($this->groups as $group)
+                        @foreach ($this->allGroups as $group)
                             <flux:checkbox
                                 wire:key="edit-contact-group-{{ $group->id }}"
                                 wire:model="editContactGroupIds"
