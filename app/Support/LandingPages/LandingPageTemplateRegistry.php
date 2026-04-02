@@ -87,7 +87,7 @@ class LandingPageTemplateRegistry
         $cacheKey = $this->fingerprintCacheKey($deactivateMissing);
         $cachedFingerprint = Cache::get($cacheKey);
 
-        if ($cachedFingerprint === $fingerprint) {
+        if ($cachedFingerprint === $fingerprint && ! $this->hasOutOfSyncTemplates($deactivateMissing)) {
             return [
                 'synced' => 0,
                 'deactivated' => 0,
@@ -99,7 +99,7 @@ class LandingPageTemplateRegistry
             $latestFingerprint = $this->filesystemFingerprint();
             $latestCachedFingerprint = Cache::get($cacheKey);
 
-            if ($latestCachedFingerprint === $latestFingerprint) {
+            if ($latestCachedFingerprint === $latestFingerprint && ! $this->hasOutOfSyncTemplates($deactivateMissing)) {
                 return [
                     'synced' => 0,
                     'deactivated' => 0,
@@ -116,6 +116,58 @@ class LandingPageTemplateRegistry
                 'skipped' => false,
             ];
         });
+    }
+
+    protected function hasOutOfSyncTemplates(bool $deactivateMissing): bool
+    {
+        $definitions = $this->definitions();
+        $definitionsByKey = collect($definitions)
+            ->keyBy(static fn (array $definition): string => (string) $definition['key']);
+
+        $dbTemplatesByKey = LandingPageTemplate::query()
+            ->where('is_active', true)
+            ->get(['key', 'name', 'description', 'view_path', 'schema', 'preview_image_url', 'version'])
+            ->keyBy('key');
+
+        foreach ($definitionsByKey as $key => $definition) {
+            $dbTemplate = $dbTemplatesByKey->get($key);
+
+            if ($dbTemplate === null) {
+                return true;
+            }
+
+            $dbPayload = [
+                'name' => $dbTemplate->name,
+                'description' => $dbTemplate->description,
+                'view_path' => $dbTemplate->view_path,
+                'schema' => is_array($dbTemplate->schema) ? $dbTemplate->schema : [],
+                'preview_image_url' => $dbTemplate->preview_image_url,
+                'version' => (int) $dbTemplate->version,
+            ];
+
+            $definitionPayload = [
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'view_path' => $definition['view_path'],
+                'schema' => $definition['schema'],
+                'preview_image_url' => $definition['preview_image_url'],
+                'version' => $definition['version'],
+            ];
+
+            if ($dbPayload != $definitionPayload) {
+                return true;
+            }
+        }
+
+        if ($deactivateMissing) {
+            $extraActiveKeys = $dbTemplatesByKey->keys()->diff($definitionsByKey->keys());
+
+            if ($extraActiveKeys->isNotEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function filesystemFingerprint(): string
