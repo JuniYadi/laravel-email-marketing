@@ -3,6 +3,8 @@
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Models\User;
+use App\Support\LandingPages\LandingPageTemplateRegistry;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 it('requires authentication for landing pages index', function () {
@@ -121,6 +123,87 @@ it('keeps template fields independent after switching templates in create flow',
 
     expect(data_get($landingPage->form_data, 'headline_highlight'))->toBe('Create Flow Highlight');
     expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/create-flow-cta');
+});
+
+it('syncs stale filesystem-backed template definition when opening editor', function () {
+    $this->actingAs(User::factory()->create());
+    Cache::flush();
+
+    $definition = collect(app(LandingPageTemplateRegistry::class)->definitions())->first();
+
+    expect($definition)->toBeArray();
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => (string) ($definition['key'] ?? 'template-key'),
+        'name' => 'Stale Template Name',
+        'description' => 'Stale description',
+        'view_path' => 'landing-page-templates.stale.view',
+        'schema' => [
+            'fields' => [
+                ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
+            ],
+        ],
+        'version' => 1,
+        'is_active' => true,
+    ]);
+
+    $landingPage = LandingPage::factory()->create([
+        'landing_page_template_id' => $template->id,
+        'template_snapshot' => [
+            'key' => (string) ($definition['key'] ?? 'template-key'),
+            'name' => 'Stale Template Name',
+            'description' => 'Old snapshot',
+            'view_path' => 'landing-page-templates.stale.view',
+            'version' => 1,
+            'schema' => [
+                'fields' => [
+                    ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
+                ],
+            ],
+        ],
+        'form_data' => [
+            'legacy_only_field' => 'Legacy value',
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id]);
+
+    $template->refresh();
+
+    expect($template->name)->toBe((string) ($definition['name'] ?? ''))
+        ->and($template->view_path)->toBe((string) ($definition['view_path'] ?? ''))
+        ->and(is_array($template->schema) ? $template->schema : [])->toEqual($definition['schema'] ?? []);
+});
+
+it('automatically syncs filesystem templates when landing page index loads', function () {
+    $this->actingAs(User::factory()->create());
+    Cache::flush();
+
+    $definition = collect(app(LandingPageTemplateRegistry::class)->definitions())->first();
+
+    expect($definition)->toBeArray();
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => (string) ($definition['key'] ?? 'template-key'),
+        'name' => 'Stale Template Name',
+        'description' => 'Stale description',
+        'view_path' => 'landing-page-templates.stale.view',
+        'schema' => [
+            'fields' => [
+                ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
+            ],
+        ],
+        'version' => 1,
+        'is_active' => true,
+    ]);
+
+    Livewire::test('pages::landing-pages.index');
+
+    $template->refresh();
+
+    expect($template->name)->toBe((string) ($definition['name'] ?? ''))
+        ->and($template->view_path)->toBe((string) ($definition['view_path'] ?? ''))
+        ->and(is_array($template->schema) ? $template->schema : [])->toEqual($definition['schema'] ?? []);
 });
 
 it('opens preview modal and switches preview viewport in landing page editor', function () {

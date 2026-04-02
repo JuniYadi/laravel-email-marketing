@@ -3,13 +3,20 @@
 namespace App\Support\LandingPages;
 
 use App\Models\LandingPageTemplate;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
+use Throwable;
 
 class LandingPageTemplateRegistry
 {
+    protected const SYNC_LOCK_KEY = 'landing-pages:templates:sync-lock';
+
+    protected const FINGERPRINT_CACHE_KEY_PREFIX = 'landing-pages:templates:fingerprint:v1:deactivate:';
+
     /**
      * @var list<string>
      */
@@ -29,14 +36,14 @@ class LandingPageTemplateRegistry
     /**
      * @return array{synced: int, deactivated: int}
      */
-    public function sync(): array
+    public function sync(bool $deactivateMissing = true): array
     {
         $definitions = $this->definitions();
         $activeKeys = [];
         $deactivated = 0;
         $connection = LandingPageTemplate::query()->getConnection();
 
-        $connection->transaction(function () use ($definitions, &$activeKeys, &$deactivated): void {
+        $connection->transaction(function () use ($definitions, $deactivateMissing, &$activeKeys, &$deactivated): void {
             foreach ($definitions as $definition) {
                 LandingPageTemplate::query()->updateOrCreate(
                     ['key' => $definition['key']],
@@ -54,19 +61,170 @@ class LandingPageTemplateRegistry
                 $activeKeys[] = $definition['key'];
             }
 
-            $deactivationQuery = LandingPageTemplate::query()->where('is_active', true);
+            if ($deactivateMissing) {
+                $deactivationQuery = LandingPageTemplate::query()->where('is_active', true);
 
-            if ($activeKeys !== []) {
-                $deactivationQuery->whereNotIn('key', $activeKeys);
+                if ($activeKeys !== []) {
+                    $deactivationQuery->whereNotIn('key', $activeKeys);
+                }
+
+                $deactivated = $deactivationQuery->update(['is_active' => false]);
             }
-
-            $deactivated = $deactivationQuery->update(['is_active' => false]);
         });
 
         return [
             'synced' => count($activeKeys),
             'deactivated' => $deactivated,
         ];
+    }
+
+    /**
+     * @return array{synced: int, deactivated: int, skipped: bool}
+     */
+    public function syncIfChanged(bool $deactivateMissing = true): array
+    {
+        $fingerprint = $this->filesystemFingerprint();
+        $cacheKey = $this->fingerprintCacheKey($deactivateMissing);
+        $cachedFingerprint = Cache::get($cacheKey);
+
+        if ($cachedFingerprint === $fingerprint && ! $this->hasOutOfSyncTemplates($deactivateMissing)) {
+            return [
+                'synced' => 0,
+                'deactivated' => 0,
+                'skipped' => true,
+            ];
+        }
+
+        return $this->synchronizeWithLock(function () use ($deactivateMissing, $cacheKey): array {
+            $latestFingerprint = $this->filesystemFingerprint();
+            $latestCachedFingerprint = Cache::get($cacheKey);
+
+            if ($latestCachedFingerprint === $latestFingerprint && ! $this->hasOutOfSyncTemplates($deactivateMissing)) {
+                return [
+                    'synced' => 0,
+                    'deactivated' => 0,
+                    'skipped' => true,
+                ];
+            }
+
+            $result = $this->sync($deactivateMissing);
+            Cache::forever($cacheKey, $latestFingerprint);
+
+            return [
+                'synced' => $result['synced'],
+                'deactivated' => $result['deactivated'],
+                'skipped' => false,
+            ];
+        });
+    }
+
+    protected function hasOutOfSyncTemplates(bool $deactivateMissing): bool
+    {
+        $definitions = $this->definitions();
+        $definitionsByKey = collect($definitions)
+            ->keyBy(static fn (array $definition): string => (string) $definition['key']);
+
+        $dbTemplatesByKey = LandingPageTemplate::query()
+            ->where('is_active', true)
+            ->get(['key', 'name', 'description', 'view_path', 'schema', 'preview_image_url', 'version'])
+            ->keyBy('key');
+
+        foreach ($definitionsByKey as $key => $definition) {
+            $dbTemplate = $dbTemplatesByKey->get($key);
+
+            if ($dbTemplate === null) {
+                return true;
+            }
+
+            $dbPayload = [
+                'name' => $dbTemplate->name,
+                'description' => $dbTemplate->description,
+                'view_path' => $dbTemplate->view_path,
+                'schema' => is_array($dbTemplate->schema) ? $dbTemplate->schema : [],
+                'preview_image_url' => $dbTemplate->preview_image_url,
+                'version' => (int) $dbTemplate->version,
+            ];
+
+            $definitionPayload = [
+                'name' => $definition['name'],
+                'description' => $definition['description'],
+                'view_path' => $definition['view_path'],
+                'schema' => $definition['schema'],
+                'preview_image_url' => $definition['preview_image_url'],
+                'version' => $definition['version'],
+            ];
+
+            if ($dbPayload != $definitionPayload) {
+                return true;
+            }
+        }
+
+        if ($deactivateMissing) {
+            $extraActiveKeys = $dbTemplatesByKey->keys()->diff($definitionsByKey->keys());
+
+            if ($extraActiveKeys->isNotEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function filesystemFingerprint(): string
+    {
+        $basePath = resource_path('views/landing-page-templates');
+
+        if (! File::exists($basePath)) {
+            return 'missing';
+        }
+
+        $directories = File::directories($basePath);
+        sort($directories);
+
+        $hash = hash_init('sha256');
+
+        foreach ($directories as $directory) {
+            $templateKey = basename($directory);
+            hash_update($hash, $templateKey."\n");
+
+            foreach (['template.json', 'view.blade.php'] as $fileName) {
+                $filePath = $directory.'/'.$fileName;
+                hash_update($hash, $fileName.':');
+
+                if (! File::exists($filePath)) {
+                    hash_update($hash, "missing\n");
+
+                    continue;
+                }
+
+                hash_update($hash, (string) File::get($filePath));
+                hash_update($hash, "\n");
+            }
+        }
+
+        return hash_final($hash);
+    }
+
+    protected function fingerprintCacheKey(bool $deactivateMissing): string
+    {
+        return self::FINGERPRINT_CACHE_KEY_PREFIX.($deactivateMissing ? '1' : '0');
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  callable(): TResult  $callback
+     * @return TResult
+     */
+    protected function synchronizeWithLock(callable $callback): mixed
+    {
+        try {
+            return Cache::lock(self::SYNC_LOCK_KEY, 10)->block(5, $callback);
+        } catch (LockTimeoutException) {
+            return $callback();
+        } catch (Throwable) {
+            return $callback();
+        }
     }
 
     /**

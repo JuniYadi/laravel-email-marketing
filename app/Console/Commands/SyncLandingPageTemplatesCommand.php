@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
+use App\Support\LandingPages\LandingPageTemplateFormDataMigrator;
 use App\Support\LandingPages\LandingPageTemplateRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -11,6 +12,11 @@ use Throwable;
 
 class SyncLandingPageTemplatesCommand extends Command
 {
+    public function __construct(protected LandingPageTemplateFormDataMigrator $formDataMigrator)
+    {
+        parent::__construct();
+    }
+
     /**
      * The name and signature of the console command.
      *
@@ -110,56 +116,6 @@ class SyncLandingPageTemplatesCommand extends Command
      */
     protected function migrateLegacyFormData(string $templateKey, array $formData): array
     {
-        if ($templateKey !== 'template-event') {
-            return $formData;
-        }
-
-        if (isset($formData['cards']) && is_array($formData['cards']) && count($formData['cards']) > 0) {
-            return $formData;
-        }
-
-        $cards = [];
-
-        for ($index = 1; $index <= 6; $index++) {
-            $title = trim((string) ($formData['card_'.$index.'_title'] ?? ''));
-            $content = (string) ($formData['card_'.$index.'_content'] ?? '');
-            $hasContent = trim(strip_tags($content)) !== '';
-
-            if ($title === '' && ! $hasContent) {
-                continue;
-            }
-
-            $cards[] = [
-                'order' => $index,
-                'title' => $title === '' ? 'Section '.$index : $title,
-                'content' => $content,
-            ];
-        }
-
-        if ($cards === []) {
-            $legacyCards = [
-                ['title' => 'Program Description', 'content' => (string) ($formData['program_description'] ?? '')],
-                ['title' => "Event's Format", 'content' => (string) ($formData['event_format_details'] ?? '')],
-                ['title' => 'Modules', 'content' => (string) ($formData['modules_list'] ?? '')],
-            ];
-
-            foreach ($legacyCards as $legacyIndex => $legacyCard) {
-                if (trim(strip_tags($legacyCard['content'])) === '') {
-                    continue;
-                }
-
-                $cards[] = [
-                    'order' => $legacyIndex + 1,
-                    'title' => $legacyCard['title'],
-                    'content' => $legacyCard['content'],
-                ];
-            }
-        }
-
-        if ($cards !== []) {
-            $formData['cards'] = $cards;
-        }
-
-        return $formData;
+        return $this->formDataMigrator->migrate($templateKey, $formData);
     }
 }
