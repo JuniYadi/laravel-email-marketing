@@ -3,6 +3,7 @@
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Models\User;
+use App\Support\LandingPages\LandingPageTemplateRegistry;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
@@ -124,18 +125,22 @@ it('keeps template fields independent after switching templates in create flow',
     expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/create-flow-cta');
 });
 
-it('migrates legacy template event cta fields when opening editor', function () {
+it('syncs stale filesystem-backed template definition when opening editor', function () {
     $this->actingAs(User::factory()->create());
     Cache::flush();
 
+    $definition = collect(app(LandingPageTemplateRegistry::class)->definitions())->first();
+
+    expect($definition)->toBeArray();
+
     $template = LandingPageTemplate::factory()->create([
-        'key' => 'template-event',
-        'name' => 'Legacy Template Event',
-        'view_path' => 'landing-page-templates.template-event.view',
+        'key' => (string) ($definition['key'] ?? 'template-key'),
+        'name' => 'Stale Template Name',
+        'description' => 'Stale description',
+        'view_path' => 'landing-page-templates.stale.view',
         'schema' => [
             'fields' => [
-                ['key' => 'cta_label', 'label' => 'CTA Label', 'type' => 'text', 'required' => true],
-                ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true],
+                ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
             ],
         ],
         'version' => 1,
@@ -145,44 +150,47 @@ it('migrates legacy template event cta fields when opening editor', function () 
     $landingPage = LandingPage::factory()->create([
         'landing_page_template_id' => $template->id,
         'template_snapshot' => [
-            'key' => 'template-event',
-            'name' => 'Template Event',
+            'key' => (string) ($definition['key'] ?? 'template-key'),
+            'name' => 'Stale Template Name',
             'description' => 'Old snapshot',
-            'view_path' => 'landing-page-templates.template-event.view',
+            'view_path' => 'landing-page-templates.stale.view',
             'version' => 1,
             'schema' => [
                 'fields' => [
-                    ['key' => 'cta_label', 'label' => 'CTA Label', 'type' => 'text', 'required' => true],
-                    ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true],
+                    ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
                 ],
             ],
         ],
         'form_data' => [
-            'cta_label' => 'Join Event',
-            'cta_url' => 'https://example.com/join-event',
+            'legacy_only_field' => 'Legacy value',
         ],
     ]);
 
-    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id])
-        ->assertSet('formData.cta_buttons.0.label', 'Join Event')
-        ->assertSet('formData.cta_buttons.0.url', 'https://example.com/join-event');
+    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id]);
 
     $template->refresh();
 
-    expect(collect(data_get($template->schema, 'fields', []))->pluck('key')->contains('cta_buttons'))->toBeTrue();
+    expect($template->name)->toBe((string) ($definition['name'] ?? ''))
+        ->and($template->view_path)->toBe((string) ($definition['view_path'] ?? ''))
+        ->and(is_array($template->schema) ? $template->schema : [])->toEqual($definition['schema'] ?? []);
 });
 
 it('automatically syncs filesystem templates when landing page index loads', function () {
     $this->actingAs(User::factory()->create());
     Cache::flush();
 
+    $definition = collect(app(LandingPageTemplateRegistry::class)->definitions())->first();
+
+    expect($definition)->toBeArray();
+
     $template = LandingPageTemplate::factory()->create([
-        'key' => 'template-event',
-        'name' => 'Stale Template Event',
-        'view_path' => 'landing-page-templates.template-event.view',
+        'key' => (string) ($definition['key'] ?? 'template-key'),
+        'name' => 'Stale Template Name',
+        'description' => 'Stale description',
+        'view_path' => 'landing-page-templates.stale.view',
         'schema' => [
             'fields' => [
-                ['key' => 'headline_text', 'label' => 'Headline Text', 'type' => 'text', 'required' => true],
+                ['key' => 'legacy_only_field', 'label' => 'Legacy Only Field', 'type' => 'text', 'required' => false],
             ],
         ],
         'version' => 1,
@@ -193,8 +201,9 @@ it('automatically syncs filesystem templates when landing page index loads', fun
 
     $template->refresh();
 
-    expect($template->name)->toBe('Template Event')
-        ->and(collect(data_get($template->schema, 'fields', []))->pluck('key')->contains('cta_buttons'))->toBeTrue();
+    expect($template->name)->toBe((string) ($definition['name'] ?? ''))
+        ->and($template->view_path)->toBe((string) ($definition['view_path'] ?? ''))
+        ->and(is_array($template->schema) ? $template->schema : [])->toEqual($definition['schema'] ?? []);
 });
 
 it('opens preview modal and switches preview viewport in landing page editor', function () {
