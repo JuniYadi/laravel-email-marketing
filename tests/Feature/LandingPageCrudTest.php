@@ -3,6 +3,7 @@
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 it('requires authentication for landing pages index', function () {
@@ -121,6 +122,79 @@ it('keeps template fields independent after switching templates in create flow',
 
     expect(data_get($landingPage->form_data, 'headline_highlight'))->toBe('Create Flow Highlight');
     expect(data_get($landingPage->form_data, 'cta_url'))->toBe('https://example.com/create-flow-cta');
+});
+
+it('migrates legacy template event cta fields when opening editor', function () {
+    $this->actingAs(User::factory()->create());
+    Cache::flush();
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => 'template-event',
+        'name' => 'Legacy Template Event',
+        'view_path' => 'landing-page-templates.template-event.view',
+        'schema' => [
+            'fields' => [
+                ['key' => 'cta_label', 'label' => 'CTA Label', 'type' => 'text', 'required' => true],
+                ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true],
+            ],
+        ],
+        'version' => 1,
+        'is_active' => true,
+    ]);
+
+    $landingPage = LandingPage::factory()->create([
+        'landing_page_template_id' => $template->id,
+        'template_snapshot' => [
+            'key' => 'template-event',
+            'name' => 'Template Event',
+            'description' => 'Old snapshot',
+            'view_path' => 'landing-page-templates.template-event.view',
+            'version' => 1,
+            'schema' => [
+                'fields' => [
+                    ['key' => 'cta_label', 'label' => 'CTA Label', 'type' => 'text', 'required' => true],
+                    ['key' => 'cta_url', 'label' => 'CTA URL', 'type' => 'url', 'required' => true],
+                ],
+            ],
+        ],
+        'form_data' => [
+            'cta_label' => 'Join Event',
+            'cta_url' => 'https://example.com/join-event',
+        ],
+    ]);
+
+    Livewire::test('pages::landing-pages.editor', ['landingPage' => $landingPage->id])
+        ->assertSet('formData.cta_buttons.0.label', 'Join Event')
+        ->assertSet('formData.cta_buttons.0.url', 'https://example.com/join-event');
+
+    $template->refresh();
+
+    expect(collect(data_get($template->schema, 'fields', []))->pluck('key')->contains('cta_buttons'))->toBeTrue();
+});
+
+it('automatically syncs filesystem templates when landing page index loads', function () {
+    $this->actingAs(User::factory()->create());
+    Cache::flush();
+
+    $template = LandingPageTemplate::factory()->create([
+        'key' => 'template-event',
+        'name' => 'Stale Template Event',
+        'view_path' => 'landing-page-templates.template-event.view',
+        'schema' => [
+            'fields' => [
+                ['key' => 'headline_text', 'label' => 'Headline Text', 'type' => 'text', 'required' => true],
+            ],
+        ],
+        'version' => 1,
+        'is_active' => true,
+    ]);
+
+    Livewire::test('pages::landing-pages.index');
+
+    $template->refresh();
+
+    expect($template->name)->toBe('Template Event')
+        ->and(collect(data_get($template->schema, 'fields', []))->pluck('key')->contains('cta_buttons'))->toBeTrue();
 });
 
 it('opens preview modal and switches preview viewport in landing page editor', function () {
