@@ -2,7 +2,9 @@
 
 use App\Models\LandingPage;
 use App\Models\LandingPageTemplate;
+use App\Support\LandingPages\LandingPageTemplateFormDataMigrator;
 use App\Support\LandingPages\LandingPageRenderer;
+use App\Support\LandingPages\LandingPageTemplateRegistry;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Vite;
@@ -53,8 +55,12 @@ new class extends Component
      */
     public array $templateSnapshot = [];
 
+    protected bool $templateDefinitionsSynced = false;
+
     public function mount(LandingPage|int|string|null $landingPage = null): void
     {
+        $this->syncTemplateDefinitions();
+
         $editable = $this->resolveLandingPage($landingPage);
 
         if ($editable !== null) {
@@ -68,6 +74,13 @@ new class extends Component
             $this->meta = array_replace($this->defaultMeta(), is_array($editable->meta) ? $editable->meta : []);
             $this->formData = is_array($editable->form_data) ? $editable->form_data : [];
             $this->templateSnapshot = is_array($editable->template_snapshot) ? $editable->template_snapshot : [];
+            $this->formData = $this->migrateLegacyFormData($this->templateSnapshot, $this->formData);
+
+            $template = LandingPageTemplate::query()->find((int) $editable->landing_page_template_id);
+
+            if ($template instanceof LandingPageTemplate) {
+                $this->applyTemplate($template);
+            }
 
             return;
         }
@@ -183,10 +196,39 @@ new class extends Component
     #[Computed]
     public function templates(): Collection
     {
+        $this->syncTemplateDefinitions();
+
         return LandingPageTemplate::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * @param  array<string, mixed>  $templateSnapshot
+     * @param  array<string, mixed>  $formData
+     * @return array<string, mixed>
+     */
+    protected function migrateLegacyFormData(array $templateSnapshot, array $formData): array
+    {
+        $templateKey = (string) ($templateSnapshot['key'] ?? '');
+
+        return app(LandingPageTemplateFormDataMigrator::class)->migrate($templateKey, $formData);
+    }
+
+    protected function syncTemplateDefinitions(): void
+    {
+        if ($this->templateDefinitionsSynced) {
+            return;
+        }
+
+        $this->templateDefinitionsSynced = true;
+
+        try {
+            app(LandingPageTemplateRegistry::class)->syncIfChanged(false);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

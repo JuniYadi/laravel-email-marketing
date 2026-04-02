@@ -1,12 +1,22 @@
 <?php
 
 use App\Models\LandingPage;
+use App\Support\LandingPages\LandingPageTemplateRegistry;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component {
+    public function mount(LandingPageTemplateRegistry $registry): void
+    {
+        try {
+            $registry->syncIfChanged(false);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
     public function publishPage(int $landingPageId): void
     {
         $landingPage = LandingPage::query()
