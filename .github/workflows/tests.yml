@@ -14,6 +14,10 @@ on:
       - master
       - workos
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -56,5 +60,14 @@ jobs:
       - name: Build Assets
         run: npm run build
 
-      - name: Run Tests
-        run: ./vendor/bin/pest
+      - name: Run Tests with Coverage
+        run: php -d xdebug.mode=coverage ./vendor/bin/pest --coverage-clover=coverage.xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.php-version == '8.5'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          verbose: true
+          use_oidc: true
