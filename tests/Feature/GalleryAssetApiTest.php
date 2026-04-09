@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Requests\PresignGalleryAssetsRequest;
 use App\Models\MediaAsset;
 use App\Models\User;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -90,6 +91,20 @@ it('rejects disallowed mime types on presign', function (): void {
             ],
         ],
     ])->assertUnprocessable()->assertInvalid(['files.0.mime_type']);
+});
+
+it('rejects oversized files on presign', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $this->postJson(route('gallery.assets.presign'), [
+        'files' => [
+            [
+                'name' => 'too-large.pdf',
+                'size' => PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES + 1,
+                'mime_type' => 'application/pdf',
+            ],
+        ],
+    ])->assertUnprocessable()->assertInvalid(['files.0.size']);
 });
 
 it('finalizes upload and persists media asset metadata', function (): void {

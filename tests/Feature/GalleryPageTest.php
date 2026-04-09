@@ -6,6 +6,8 @@ use App\Models\User;
 use Livewire\Livewire;
 
 it('shows gallery page and sidebar item for authenticated users', function (): void {
+    config()->set('filesystems.disks.s3.url', 'https://cdn.example.com');
+
     $this->actingAs(User::factory()->create());
 
     $this->get(route('gallery.index'))
@@ -14,7 +16,18 @@ it('shows gallery page and sidebar item for authenticated users', function (): v
         ->assertSee('Upload files')
         ->assertSee(route('gallery.index'), false)
         ->assertSee('data-max-size-bytes="'.PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES.'"', false)
-        ->assertSee('application/pdf');
+        ->assertSee('application/pdf')
+        ->assertDontSee('S3 public base URL is not configured');
+});
+
+it('shows guidance when s3 public base url is missing', function (): void {
+    config()->set('filesystems.disks.s3.url', null);
+
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('gallery.index'))
+        ->assertOk()
+        ->assertSee('S3 public base URL is not configured');
 });
 
 it('lists uploaded assets on gallery page', function (): void {
