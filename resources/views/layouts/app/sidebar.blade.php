@@ -35,6 +35,9 @@
                     <flux:sidebar.item icon="envelope" :href="route('templates.index')" :current="request()->routeIs('templates.index')" wire:navigate>
                         {{ __('Templates') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="photo" :href="route('gallery.index')" :current="request()->routeIs('gallery.index')" wire:navigate>
+                        {{ __('Gallery') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
 
                 <flux:sidebar.group :heading="__('Landing Page')" class="grid">
