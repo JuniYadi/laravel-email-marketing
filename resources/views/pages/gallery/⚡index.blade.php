@@ -111,8 +111,8 @@ new class extends Component {
                     />
 
                     <flux:button type="button" variant="primary" x-on:click="upload" x-bind:disabled="uploading">
-                        <span x-show="!uploading">{{ __('Upload files') }}</span>
-                        <span x-show="uploading">{{ __('Uploading...') }}</span>
+                        <span class="text-white" x-show="!uploading">{{ __('Upload files') }}</span>
+                        <span class="text-white" x-show="uploading">{{ __('Uploading...') }}</span>
                     </flux:button>
                 </div>
 
