@@ -1,5 +1,6 @@
 # Laravel Marketing Mail
 
+[![codecov](https://codecov.io/gh/JuniYadi/laravel-email-marketing/graph/badge.svg?token=5uwW0qDo3w)](https://codecov.io/gh/JuniYadi/laravel-email-marketing)
 [![GitHub release](https://img.shields.io/github/v/release/JuniYadi/laravel-email-marketing?include_prereleases)](https://github.com/JuniYadi/laravel-email-marketing/releases)
 [![Docker](https://img.shields.io/badge/ghcr.io-juniyadi%2Flaravel--marketing--mail-blue)](https://github.com/JuniYadi/laravel-email-marketing/pkgs/container/laravel-marketing-mail)
 [![License](https://img.shields.io/github/license/JuniYadi/laravel-email-marketing)](LICENSE)
