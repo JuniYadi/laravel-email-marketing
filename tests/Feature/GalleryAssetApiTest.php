@@ -49,7 +49,33 @@ it('returns presigned uploads for allowed image and pdf files', function (): voi
     $response->assertOk()
         ->assertJsonCount(2, 'uploads')
         ->assertJsonPath('uploads.0.disk', 's3')
-        ->assertJsonPath('uploads.0.method', 'PUT');
+        ->assertJsonPath('uploads.0.method', 'PUT')
+        ->assertJsonPath('uploads.0.mime_type', 'image/png')
+        ->assertJsonPath('uploads.1.mime_type', 'application/pdf');
+});
+
+it('returns validation error when presign temporary upload url generation fails', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $mockedDisk = \Mockery::mock(FilesystemAdapter::class);
+    $mockedDisk->shouldReceive('temporaryUploadUrl')
+        ->once()
+        ->andThrow(new \RuntimeException('temporary upload unsupported'));
+
+    Storage::shouldReceive('disk')
+        ->once()
+        ->with('s3')
+        ->andReturn($mockedDisk);
+
+    $this->postJson(route('gallery.assets.presign'), [
+        'files' => [
+            [
+                'name' => 'banner.png',
+                'size' => 1024,
+                'mime_type' => 'image/png',
+            ],
+        ],
+    ])->assertUnprocessable()->assertInvalid(['files']);
 });
 
 it('rejects disallowed mime types on presign', function (): void {
@@ -114,6 +140,53 @@ it('rejects finalize when object is missing', function (): void {
             ],
         ],
     ])->assertUnprocessable()->assertInvalid(['uploads']);
+});
+
+it('rejects finalize for unsafe gallery path', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    Storage::fake('s3');
+    Storage::disk('s3')->put('gallery-assets/unsafe.png', 'abc');
+
+    $this->postJson(route('gallery.assets.finalize'), [
+        'uploads' => [
+            [
+                'name' => 'unsafe.png',
+                'path' => '../gallery-assets/unsafe.png',
+                'disk' => 's3',
+                'mime_type' => 'image/png',
+                'size' => 3,
+            ],
+        ],
+    ])->assertUnprocessable()->assertInvalid(['uploads']);
+});
+
+it('resolves pdf kind and falls back to disk url when configured base url is empty', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    config()->set('filesystems.disks.s3.url', null);
+    Storage::fake('s3');
+    Storage::disk('s3')->put('gallery-assets/manual.pdf', str_repeat('b', 8));
+
+    $response = $this->postJson(route('gallery.assets.finalize'), [
+        'uploads' => [
+            [
+                'name' => 'manual.pdf',
+                'path' => 'gallery-assets/manual.pdf',
+                'disk' => 's3',
+                'mime_type' => 'application/pdf',
+                'size' => 8,
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+
+    $asset = MediaAsset::query()->firstOrFail();
+
+    expect($asset->kind)->toBe(MediaAsset::KIND_PDF)
+        ->and($asset->public_url)->toContain('/gallery-assets/manual.pdf');
 });
 
 it('moves asset to trash and restores it', function (): void {

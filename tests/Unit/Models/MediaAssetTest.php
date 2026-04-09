@@ -70,5 +70,45 @@ it('filters media assets by active, trashed, kind, and search scopes', function 
         ->and($trashedIds)->toContain($pdf->id)
         ->and($imageIds)->toContain($image->id)
         ->and($searchIds)->toContain($image->id)
-        ->and($searchIds)->not->toContain($pdf->id);
+        ->and($searchIds)->not->toContain($pdf->id)
+        ->and($image->user->id)->toBe($user->id);
+});
+
+it('returns unfiltered query when kind and search inputs are empty', function () {
+    $user = User::factory()->create();
+
+    $first = MediaAsset::query()->create([
+        'user_id' => $user->id,
+        'external_id' => (string) Str::uuid7(),
+        'original_name' => 'first.png',
+        'storage_disk' => 's3',
+        'storage_path' => 'gallery-assets/first.png',
+        'mime_type' => 'image/png',
+        'extension' => 'png',
+        'size_bytes' => 100,
+        'public_url' => 'https://cdn.example.com/gallery-assets/first.png',
+        'kind' => MediaAsset::KIND_IMAGE,
+    ]);
+
+    $second = MediaAsset::query()->create([
+        'user_id' => $user->id,
+        'external_id' => (string) Str::uuid7(),
+        'original_name' => 'second.pdf',
+        'storage_disk' => 's3',
+        'storage_path' => 'gallery-assets/second.pdf',
+        'mime_type' => 'application/pdf',
+        'extension' => 'pdf',
+        'size_bytes' => 100,
+        'public_url' => 'https://cdn.example.com/gallery-assets/second.pdf',
+        'kind' => MediaAsset::KIND_PDF,
+    ]);
+
+    $ids = MediaAsset::query()
+        ->kind('')
+        ->search(null)
+        ->pluck('id')
+        ->all();
+
+    expect($ids)->toContain($first->id)
+        ->and($ids)->toContain($second->id);
 });
