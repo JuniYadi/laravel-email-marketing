@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Gallery\GalleryAssetController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LandingPages\LandingPageImageController;
 use App\Http\Controllers\Templates\TemplateAttachmentController;
@@ -72,6 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('landing-pages/history', 'pages::landing-pages.history')->name('landing-pages.history');
     Route::livewire('landing-pages/create', 'pages::landing-pages.editor')->name('landing-pages.create');
     Route::livewire('landing-pages/{landingPage}/edit', 'pages::landing-pages.editor')->name('landing-pages.edit');
+    Route::livewire('gallery', 'pages::gallery.index')->name('gallery.index');
 
     Route::prefix('templates/attachments')->name('templates.attachments.')->group(function () {
         Route::post('presign', [TemplateAttachmentController::class, 'presign'])->name('presign');
@@ -82,6 +84,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('landing-pages/images')->name('landing-pages.images.')->group(function () {
         Route::post('presign', [LandingPageImageController::class, 'presign'])->name('presign');
+    });
+
+    Route::prefix('gallery/assets')->name('gallery.assets.')->group(function () {
+        Route::post('presign', [GalleryAssetController::class, 'presign'])->name('presign');
+        Route::post('finalize', [GalleryAssetController::class, 'finalize'])->name('finalize');
+        Route::patch('{asset}/restore', [GalleryAssetController::class, 'restore'])->name('restore');
+        Route::delete('{asset}', [GalleryAssetController::class, 'trash'])->name('trash');
     });
 });
 
