@@ -110,9 +110,9 @@ new class extends Component {
                         accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
                     />
 
-                    <flux:button type="button" variant="primary" x-on:click="upload" x-bind:disabled="uploading">
-                        <span class="text-white" x-show="!uploading">{{ __('Upload files') }}</span>
-                        <span class="text-white" x-show="uploading">{{ __('Uploading...') }}</span>
+                    <flux:button type="button" variant="primary" icon="arrow-up-tray" x-on:click="upload" x-bind:disabled="uploading" x-cloak>
+                        <span x-show="!uploading">{{ __('Upload files') }}</span>
+                        <template x-if="uploading"><span>{{ __('Uploading...') }}</span></template>
                     </flux:button>
                 </div>
 
