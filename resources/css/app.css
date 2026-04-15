@@ -107,3 +107,8 @@ trix-editor ol,
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+
+/* Required for x-cloak to work — hides elements until Alpine.js initializes */
+[x-cloak] {
+    display: none !important;
+}
