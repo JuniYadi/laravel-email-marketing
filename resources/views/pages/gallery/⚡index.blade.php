@@ -106,7 +106,7 @@ new class extends Component {
                         x-ref="files"
                         type="file"
                         multiple
-                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:file:bg-zinc-700 dark:file:text-zinc-100 dark:hover:file:bg-zinc-600"
                         accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
                     />
 

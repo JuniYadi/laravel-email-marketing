@@ -17,6 +17,8 @@ it('shows gallery page and sidebar item for authenticated users', function (): v
         ->assertSee(route('gallery.index'), false)
         ->assertSee('data-max-size-bytes="'.PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES.'"', false)
         ->assertSee('application/pdf')
+        ->assertSee('file:bg-zinc-100')
+        ->assertSee('dark:file:bg-zinc-700')
         ->assertDontSee('S3 public base URL is not configured');
 });
 
