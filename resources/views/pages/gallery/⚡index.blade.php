@@ -78,152 +78,8 @@ new class extends Component {
     }
 }; ?>
 
-<section class="w-full">
-    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-8">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <flux:heading size="xl">{{ __('Gallery') }}</flux:heading>
-                <flux:text class="mt-2">{{ __('Upload and manage public media assets for HTML email embeds.') }}</flux:text>
-            </div>
-        </div>
-
-        <div
-            class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
-            data-max-size-bytes="{{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }}"
-            data-allowed-mime-types="{{ implode(',', PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES) }}"
-            x-data="galleryUploader({
-                presignUrl: '{{ route('gallery.assets.presign') }}',
-                finalizeUrl: '{{ route('gallery.assets.finalize') }}',
-                csrfToken: '{{ csrf_token() }}',
-                maxBytes: {{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }},
-                allowedMimeTypes: @js(PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES),
-                refresh: () => $wire.$refresh(),
-            })"
-        >
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex flex-wrap items-center gap-2">
-                    <input
-                        x-ref="files"
-                        type="file"
-                        multiple
-                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:file:bg-zinc-700 dark:file:text-zinc-100 dark:hover:file:bg-zinc-600"
-                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
-                    />
-
-                    <flux:button type="button" variant="primary" icon="arrow-up-tray" x-on:click="upload" x-bind:disabled="uploading" x-cloak>
-                        <span x-show="!uploading">{{ __('Upload files') }}</span>
-                        <template x-if="uploading"><span>{{ __('Uploading...') }}</span></template>
-                    </flux:button>
-                </div>
-
-                <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
-                    {{ __('Allowed: JPG, PNG, WEBP, GIF, SVG, PDF. Max :max MB per file.', ['max' => (int) (PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES / 1024 / 1024)]) }}
-                </flux:text>
-            </div>
-
-            <p x-show="message !== ''" x-text="message" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300"></p>
-
-            @if ($this->configuredPublicBaseUrl() === '')
-                <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
-                    {{ __('S3 public base URL is not configured. Set filesystems.disks.s3.url or ensure bucket policy/public URL is configured for stable external links.') }}
-                </div>
-            @endif
-        </div>
-
-        <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-            <div class="grid gap-3 lg:grid-cols-4">
-                <div>
-                    <label for="gallery-kind" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Type') }}</label>
-                    <select id="gallery-kind" wire:model.live="kindFilter" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900">
-                        <option value="all">{{ __('All') }}</option>
-                        <option value="image">{{ __('Image') }}</option>
-                        <option value="pdf">{{ __('PDF') }}</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="gallery-status" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Status') }}</label>
-                    <select id="gallery-status" wire:model.live="statusFilter" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900">
-                        <option value="active">{{ __('Active') }}</option>
-                        <option value="trashed">{{ __('Trashed') }}</option>
-                    </select>
-                </div>
-
-                <div class="lg:col-span-2">
-                    <label for="gallery-search" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Search') }}</label>
-                    <input id="gallery-search" type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('Search by filename or external id') }}" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead>
-                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="py-2 pe-3">{{ __('Preview') }}</th>
-                            <th class="py-2 pe-3">{{ __('Name') }}</th>
-                            <th class="py-2 pe-3">{{ __('External ID') }}</th>
-                            <th class="py-2 pe-3">{{ __('Type') }}</th>
-                            <th class="py-2 pe-3">{{ __('Size') }}</th>
-                            <th class="py-2 pe-3">{{ __('Uploaded') }}</th>
-                            <th class="py-2">{{ __('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($this->assets as $asset)
-                            <tr class="border-b border-zinc-100 align-top dark:border-zinc-800" wire:key="gallery-asset-{{ $asset->id }}">
-                                <td class="py-2 pe-3">
-                                    @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
-                                        <img src="{{ $asset->public_url }}" alt="{{ $asset->original_name }}" class="h-10 w-10 rounded object-cover" loading="lazy" />
-                                    @else
-                                        <span class="inline-flex h-10 w-10 items-center justify-center rounded bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">PDF</span>
-                                    @endif
-                                </td>
-                                <td class="py-2 pe-3">{{ $asset->original_name }}</td>
-                                <td class="py-2 pe-3 font-mono text-xs">{{ $asset->external_id }}</td>
-                                <td class="py-2 pe-3">
-                                    @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
-                                        <flux:badge color="sky" size="sm">{{ __('Image') }}</flux:badge>
-                                    @else
-                                        <flux:badge color="amber" size="sm">{{ __('PDF') }}</flux:badge>
-                                    @endif
-                                </td>
-                                <td class="py-2 pe-3">{{ number_format((int) $asset->size_bytes) }} B</td>
-                                <td class="py-2 pe-3">{{ $asset->created_at?->diffForHumans() }}</td>
-                                <td class="py-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <flux:button size="sm" variant="ghost" wire:click="copyExternalUrl({{ $asset->id }})">{{ __('Copy URL') }}</flux:button>
-                                        <flux:button size="sm" variant="ghost" :href="$this->getExternalUrl($asset)" target="_blank" rel="noreferrer">{{ __('Open') }}</flux:button>
-
-                                        @if ($statusFilter === 'trashed')
-                                            <flux:button size="sm" variant="primary" wire:click="restore({{ $asset->id }})">{{ __('Restore') }}</flux:button>
-                                        @else
-                                            <flux:button size="sm" variant="danger" wire:click="trash({{ $asset->id }})">{{ __('Trash') }}</flux:button>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td class="py-4" colspan="7">
-                                    <flux:text>{{ __('No assets found for current filters.') }}</flux:text>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-4">
-                {{ $this->assets->links() }}
-            </div>
-        </div>
-    </div>
-</section>
-
 <script>
-    function galleryUploader(config) {
+    window.galleryUploader = function galleryUploader(config) {
         return {
             uploading: false,
             message: '',
@@ -341,7 +197,7 @@ new class extends Component {
                 }
             },
         };
-    }
+    };
 
     window.addEventListener('gallery-url-copied', async (event) => {
         const url = event?.detail?.url;
@@ -357,3 +213,149 @@ new class extends Component {
         }
     });
 </script>
+
+<section class="w-full">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-8">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <flux:heading size="xl">{{ __('Gallery') }}</flux:heading>
+                <flux:text class="mt-2">{{ __('Upload and manage public media assets for HTML email embeds.') }}</flux:text>
+            </div>
+        </div>
+
+        <div
+            class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
+            data-max-size-bytes="{{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }}"
+            data-allowed-mime-types="{{ implode(',', PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES) }}"
+            x-data="galleryUploader({
+                presignUrl: '{{ route('gallery.assets.presign') }}',
+                finalizeUrl: '{{ route('gallery.assets.finalize') }}',
+                csrfToken: '{{ csrf_token() }}',
+                maxBytes: {{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }},
+                allowedMimeTypes: @js(PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES),
+                refresh: () => $wire.$refresh(),
+            })"
+        >
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex flex-wrap items-center gap-2">
+                    <input
+                        x-ref="files"
+                        type="file"
+                        multiple
+                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:file:bg-zinc-700 dark:file:text-zinc-100 dark:hover:file:bg-zinc-600"
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
+                    />
+
+                    <flux:button type="button" variant="primary" icon="arrow-up-tray" x-on:click="upload()" x-bind:disabled="uploading">
+                        <span x-show="!uploading">{{ __('Upload files') }}</span>
+                        <span x-show="uploading">{{ __('Uploading...') }}</span>
+                    </flux:button>
+                </div>
+
+                <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
+                    {{ __('Allowed: JPG, PNG, WEBP, GIF, SVG, PDF. Max :max MB per file.', ['max' => (int) (PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES / 1024 / 1024)]) }}
+                </flux:text>
+            </div>
+
+            <p x-show="message !== ''" x-text="message" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300"></p>
+
+            @if ($this->configuredPublicBaseUrl() === '')
+                <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+                    {{ __('S3 public base URL is not configured. Set filesystems.disks.s3.url or ensure bucket policy/public URL is configured for stable external links.') }}
+                </div>
+            @endif
+        </div>
+
+        <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+            <div class="grid gap-3 lg:grid-cols-4">
+                <div>
+                    <label for="gallery-kind" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Type') }}</label>
+                    <select id="gallery-kind" wire:model.live="kindFilter" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900">
+                        <option value="all">{{ __('All') }}</option>
+                        <option value="image">{{ __('Image') }}</option>
+                        <option value="pdf">{{ __('PDF') }}</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="gallery-status" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Status') }}</label>
+                    <select id="gallery-status" wire:model.live="statusFilter" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900">
+                        <option value="active">{{ __('Active') }}</option>
+                        <option value="trashed">{{ __('Trashed') }}</option>
+                    </select>
+                </div>
+
+                <div class="lg:col-span-2">
+                    <label for="gallery-search" class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Search') }}</label>
+                    <input id="gallery-search" type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('Search by filename or external id') }}" class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900" />
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
+                            <th class="py-2 pe-3">{{ __('Preview') }}</th>
+                            <th class="py-2 pe-3">{{ __('Name') }}</th>
+                            <th class="py-2 pe-3">{{ __('External ID') }}</th>
+                            <th class="py-2 pe-3">{{ __('Type') }}</th>
+                            <th class="py-2 pe-3">{{ __('Size') }}</th>
+                            <th class="py-2 pe-3">{{ __('Uploaded') }}</th>
+                            <th class="py-2">{{ __('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($this->assets as $asset)
+                            <tr class="border-b border-zinc-100 align-top dark:border-zinc-800" wire:key="gallery-asset-{{ $asset->id }}">
+                                <td class="py-2 pe-3">
+                                    @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
+                                        <img src="{{ $asset->public_url }}" alt="{{ $asset->original_name }}" class="h-10 w-10 rounded object-cover" loading="lazy" />
+                                    @else
+                                        <span class="inline-flex h-10 w-10 items-center justify-center rounded bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">PDF</span>
+                                    @endif
+                                </td>
+                                <td class="py-2 pe-3">{{ $asset->original_name }}</td>
+                                <td class="py-2 pe-3 font-mono text-xs">{{ $asset->external_id }}</td>
+                                <td class="py-2 pe-3">
+                                    @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
+                                        <flux:badge color="sky" size="sm">{{ __('Image') }}</flux:badge>
+                                    @else
+                                        <flux:badge color="amber" size="sm">{{ __('PDF') }}</flux:badge>
+                                    @endif
+                                </td>
+                                <td class="py-2 pe-3">{{ number_format((int) $asset->size_bytes) }} B</td>
+                                <td class="py-2 pe-3">{{ $asset->created_at?->diffForHumans() }}</td>
+                                <td class="py-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <flux:button size="sm" variant="ghost" wire:click="copyExternalUrl({{ $asset->id }})">{{ __('Copy URL') }}</flux:button>
+                                        <flux:button size="sm" variant="ghost" :href="$this->getExternalUrl($asset)" target="_blank" rel="noreferrer">{{ __('Open') }}</flux:button>
+
+                                        @if ($statusFilter === 'trashed')
+                                            <flux:button size="sm" variant="primary" wire:click="restore({{ $asset->id }})">{{ __('Restore') }}</flux:button>
+                                        @else
+                                            <flux:button size="sm" variant="danger" wire:click="trash({{ $asset->id }})">{{ __('Trash') }}</flux:button>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td class="py-4" colspan="7">
+                                    <flux:text>{{ __('No assets found for current filters.') }}</flux:text>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4">
+                {{ $this->assets->links() }}
+            </div>
+        </div>
+    </div>
+</section>
+
+
