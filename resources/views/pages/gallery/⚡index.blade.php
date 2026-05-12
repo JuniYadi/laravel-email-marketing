@@ -78,142 +78,6 @@ new class extends Component {
     }
 }; ?>
 
-<script>
-    window.galleryUploader = function galleryUploader(config) {
-        return {
-            uploading: false,
-            message: '',
-            async upload() {
-                const files = Array.from(this.$refs.files?.files ?? []);
-
-                if (files.length === 0) {
-                    this.message = 'Please choose at least one file.';
-
-                    return;
-                }
-
-                const invalidFile = files.find((file) => !config.allowedMimeTypes.includes(file.type) || file.size > config.maxBytes);
-
-                if (invalidFile) {
-                    this.message = `Invalid file: ${invalidFile.name}. Check type and max 50MB limit.`;
-
-                    return;
-                }
-
-                this.uploading = true;
-                this.message = 'Preparing upload...';
-
-                try {
-                    const presignResponse = await fetch(config.presignUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': config.csrfToken,
-                        },
-                        body: JSON.stringify({
-                            files: files.map((file) => ({
-                                name: file.name,
-                                size: file.size,
-                                mime_type: file.type,
-                            })),
-                        }),
-                    });
-
-                    const presignPayload = await presignResponse.json();
-
-                    if (!presignResponse.ok) {
-                        this.message = presignPayload?.message ?? 'Unable to prepare upload URL.';
-
-                        return;
-                    }
-
-                    const uploads = presignPayload.uploads ?? [];
-
-                    if (uploads.length !== files.length) {
-                        this.message = 'Upload handshake mismatch. Please retry.';
-
-                        return;
-                    }
-
-                    for (let index = 0; index < uploads.length; index++) {
-                        const upload = uploads[index];
-                        const file = files[index];
-
-                        this.message = `Uploading ${index + 1}/${uploads.length}: ${file.name}`;
-
-                        const uploadResponse = await fetch(upload.upload_url, {
-                            method: 'PUT',
-                            headers: {
-                                ...(upload.upload_headers ?? {}),
-                                'Content-Type': file.type,
-                            },
-                            body: file,
-                        });
-
-                        if (!uploadResponse.ok) {
-                            this.message = `Failed uploading ${file.name}.`;
-
-                            return;
-                        }
-                    }
-
-                    this.message = 'Finalizing uploads...';
-
-                    const finalizeResponse = await fetch(config.finalizeUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': config.csrfToken,
-                        },
-                        body: JSON.stringify({
-                            uploads: uploads.map((upload) => ({
-                                name: upload.name,
-                                path: upload.path,
-                                disk: upload.disk,
-                                mime_type: upload.mime_type,
-                                size: upload.size,
-                            })),
-                        }),
-                    });
-
-                    const finalizePayload = await finalizeResponse.json();
-
-                    if (!finalizeResponse.ok) {
-                        this.message = finalizePayload?.message ?? 'Unable to finalize uploads.';
-
-                        return;
-                    }
-
-                    this.$refs.files.value = '';
-                    this.message = 'Upload completed.';
-
-                    await config.refresh();
-                } catch (error) {
-                    this.message = 'Unexpected upload error. Please retry.';
-                } finally {
-                    this.uploading = false;
-                }
-            },
-        };
-    };
-
-    window.addEventListener('gallery-url-copied', async (event) => {
-        const url = event?.detail?.url;
-
-        if (typeof url !== 'string' || url.length === 0) {
-            return;
-        }
-
-        try {
-            await navigator.clipboard.writeText(url);
-        } catch (error) {
-            console.error('Clipboard copy failed', error);
-        }
-    });
-</script>
-
 <section class="w-full">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-8">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -227,14 +91,124 @@ new class extends Component {
             class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
             data-max-size-bytes="{{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }}"
             data-allowed-mime-types="{{ implode(',', PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES) }}"
-            x-data="galleryUploader({
-                presignUrl: '{{ route('gallery.assets.presign') }}',
-                finalizeUrl: '{{ route('gallery.assets.finalize') }}',
-                csrfToken: '{{ csrf_token() }}',
-                maxBytes: {{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }},
-                allowedMimeTypes: @js(PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES),
-                refresh: () => $wire.$refresh(),
-            })"
+            x-data="{
+                uploading: false,
+                message: '',
+                config: {
+                    presignUrl: '{{ route('gallery.assets.presign') }}',
+                    finalizeUrl: '{{ route('gallery.assets.finalize') }}',
+                    csrfToken: '{{ csrf_token() }}',
+                    maxBytes: {{ PresignGalleryAssetsRequest::MAX_FILE_SIZE_BYTES }},
+                    allowedMimeTypes: @js(PresignGalleryAssetsRequest::ALLOWED_MIME_TYPES),
+                },
+                async upload() {
+                    const files = Array.from(this.$refs.files?.files ?? []);
+
+                    if (files.length === 0) {
+                        this.message = 'Please choose at least one file.';
+                        return;
+                    }
+
+                    const invalidFile = files.find((file) => !this.config.allowedMimeTypes.includes(file.type) || file.size > this.config.maxBytes);
+
+                    if (invalidFile) {
+                        this.message = `Invalid file: ${invalidFile.name}. Check type and max 50MB limit.`;
+                        return;
+                    }
+
+                    this.uploading = true;
+                    this.message = 'Preparing upload...';
+
+                    try {
+                        const presignResponse = await fetch(this.config.presignUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': this.config.csrfToken,
+                            },
+                            body: JSON.stringify({
+                                files: files.map((file) => ({
+                                    name: file.name,
+                                    size: file.size,
+                                    mime_type: file.type,
+                                })),
+                            }),
+                        });
+
+                        const presignPayload = await presignResponse.json();
+
+                        if (!presignResponse.ok) {
+                            this.message = presignPayload?.message ?? 'Unable to prepare upload URL.';
+                            return;
+                        }
+
+                        const uploads = presignPayload.uploads ?? [];
+
+                        if (uploads.length !== files.length) {
+                            this.message = 'Upload handshake mismatch. Please retry.';
+                            return;
+                        }
+
+                        for (let index = 0; index < uploads.length; index++) {
+                            const upload = uploads[index];
+                            const file = files[index];
+
+                            this.message = `Uploading ${index + 1}/${uploads.length}: ${file.name}`;
+
+                            const uploadResponse = await fetch(upload.upload_url, {
+                                method: 'PUT',
+                                headers: {
+                                    ...(upload.upload_headers ?? {}),
+                                    'Content-Type': file.type,
+                                },
+                                body: file,
+                            });
+
+                            if (!uploadResponse.ok) {
+                                this.message = `Failed uploading ${file.name}.`;
+                                return;
+                            }
+                        }
+
+                        this.message = 'Finalizing uploads...';
+
+                        const finalizeResponse = await fetch(this.config.finalizeUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': this.config.csrfToken,
+                            },
+                            body: JSON.stringify({
+                                uploads: uploads.map((upload) => ({
+                                    name: upload.name,
+                                    path: upload.path,
+                                    disk: upload.disk,
+                                    mime_type: upload.mime_type,
+                                    size: upload.size,
+                                })),
+                            }),
+                        });
+
+                        const finalizePayload = await finalizeResponse.json();
+
+                        if (!finalizeResponse.ok) {
+                            this.message = finalizePayload?.message ?? 'Unable to finalize uploads.';
+                            return;
+                        }
+
+                        this.$refs.files.value = '';
+                        this.message = 'Upload completed.';
+
+                        await $wire.$refresh();
+                    } catch (error) {
+                        this.message = 'Unexpected upload error. Please retry.';
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+            }"
         >
             <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex flex-wrap items-center gap-2">
@@ -242,7 +216,7 @@ new class extends Component {
                         x-ref="files"
                         type="file"
                         multiple
-                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:file:bg-zinc-700 dark:file:text-zinc-100 dark:hover:file:bg-zinc-600"
+                        class="block rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-700 file:me-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300 dark:file:bg-zinc-700 dark:file:text-zinc-100 dark:hover:file:bg-zinc-600"
                         accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
                     />
 
@@ -358,4 +332,18 @@ new class extends Component {
     </div>
 </section>
 
+<script>
+    window.addEventListener('gallery-url-copied', async (event) => {
+        const url = event?.detail?.url;
 
+        if (typeof url !== 'string' || url.length === 0) {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(url);
+        } catch (error) {
+            console.error('Clipboard copy failed', error);
+        }
+    });
+</script>
