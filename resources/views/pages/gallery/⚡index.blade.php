@@ -41,18 +41,6 @@ new class extends Component {
         $asset->restore();
     }
 
-    public function getExternalUrl(MediaAsset $asset): string
-    {
-        return $asset->public_url;
-    }
-
-    public function copyExternalUrl(int $assetId): void
-    {
-        $asset = MediaAsset::withTrashed()->findOrFail($assetId);
-
-        $this->dispatch('gallery-url-copied', url: $asset->public_url);
-    }
-
     public function configuredPublicBaseUrl(): string
     {
         return trim((string) config('filesystems.disks.s3.url'));
@@ -267,63 +255,69 @@ new class extends Component {
         </div>
 
         <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead>
-                        <tr class="border-b border-zinc-200 dark:border-zinc-700">
-                            <th class="py-2 pe-3">{{ __('Preview') }}</th>
-                            <th class="py-2 pe-3">{{ __('Name') }}</th>
-                            <th class="py-2 pe-3">{{ __('External ID') }}</th>
-                            <th class="py-2 pe-3">{{ __('Type') }}</th>
-                            <th class="py-2 pe-3">{{ __('Size') }}</th>
-                            <th class="py-2 pe-3">{{ __('Uploaded') }}</th>
-                            <th class="py-2">{{ __('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($this->assets as $asset)
-                            <tr class="border-b border-zinc-100 align-top dark:border-zinc-800" wire:key="gallery-asset-{{ $asset->id }}">
-                                <td class="py-2 pe-3">
-                                    @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
-                                        <img src="{{ $asset->public_url }}" alt="{{ $asset->original_name }}" class="h-10 w-10 rounded object-cover" loading="lazy" />
-                                    @else
-                                        <span class="inline-flex h-10 w-10 items-center justify-center rounded bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">PDF</span>
-                                    @endif
-                                </td>
-                                <td class="py-2 pe-3">{{ $asset->original_name }}</td>
-                                <td class="py-2 pe-3 font-mono text-xs">{{ $asset->external_id }}</td>
-                                <td class="py-2 pe-3">
+            @if ($this->assets->isNotEmpty())
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($this->assets as $asset)
+                        <article class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900" wire:key="gallery-asset-{{ $asset->id }}">
+                            <div class="aspect-[4/3] w-full overflow-hidden border-b border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+                                @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
+                                    <img src="{{ $asset->public_url }}" alt="{{ $asset->original_name }}" class="h-full w-full object-cover" loading="lazy" />
+                                @elseif ($asset->kind === \App\Models\MediaAsset::KIND_PDF)
+                                    <iframe
+                                        src="{{ $asset->public_url }}#page=1&view=FitH&toolbar=0&navpanes=0&scrollbar=0"
+                                        title="{{ $asset->original_name }}"
+                                        class="h-full w-full"
+                                        loading="lazy"
+                                    ></iframe>
+                                @else
+                                    <div class="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-zinc-500 dark:text-zinc-300">
+                                        <flux:icon.document size="md" />
+                                        <span class="line-clamp-2 text-xs font-medium">{{ $asset->original_name }}</span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="flex flex-col gap-3 p-4">
+                                <div class="space-y-2">
+                                    <p class="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $asset->original_name }}</p>
+                                    <p class="font-mono text-xs text-zinc-500 dark:text-zinc-400">{{ $asset->external_id }}</p>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-2">
                                     @if ($asset->kind === \App\Models\MediaAsset::KIND_IMAGE)
                                         <flux:badge color="sky" size="sm">{{ __('Image') }}</flux:badge>
-                                    @else
+                                    @elseif ($asset->kind === \App\Models\MediaAsset::KIND_PDF)
                                         <flux:badge color="amber" size="sm">{{ __('PDF') }}</flux:badge>
+                                    @else
+                                        <flux:badge color="zinc" size="sm">{{ __('File') }}</flux:badge>
                                     @endif
-                                </td>
-                                <td class="py-2 pe-3">{{ number_format((int) $asset->size_bytes) }} B</td>
-                                <td class="py-2 pe-3">{{ $asset->created_at?->diffForHumans() }}</td>
-                                <td class="py-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <flux:button size="sm" variant="ghost" wire:click="copyExternalUrl({{ $asset->id }})">{{ __('Copy URL') }}</flux:button>
-                                        <flux:button size="sm" variant="ghost" :href="$this->getExternalUrl($asset)" target="_blank" rel="noreferrer">{{ __('Open') }}</flux:button>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ number_format((int) $asset->size_bytes) }} B</span>
+                                    <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $asset->created_at?->diffForHumans() }}</span>
+                                </div>
 
-                                        @if ($statusFilter === 'trashed')
-                                            <flux:button size="sm" variant="primary" wire:click="restore({{ $asset->id }})">{{ __('Restore') }}</flux:button>
-                                        @else
-                                            <flux:button size="sm" variant="danger" wire:click="trash({{ $asset->id }})">{{ __('Trash') }}</flux:button>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td class="py-4" colspan="7">
-                                    <flux:text>{{ __('No assets found for current filters.') }}</flux:text>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <flux:button
+                                        size="sm"
+                                        variant="ghost"
+                                        x-on:click="navigator.clipboard && navigator.clipboard.writeText(@js($asset->public_url)).catch(() => {})"
+                                    >
+                                        {{ __('Copy URL') }}
+                                    </flux:button>
+                                    <flux:button size="sm" variant="ghost" href="{{ $asset->public_url }}" target="_blank" rel="noreferrer">{{ __('Open') }}</flux:button>
+
+                                    @if ($statusFilter === 'trashed')
+                                        <flux:button size="sm" variant="primary" wire:click="restore({{ $asset->id }})">{{ __('Restore') }}</flux:button>
+                                    @else
+                                        <flux:button size="sm" variant="danger" wire:click="trash({{ $asset->id }})">{{ __('Trash') }}</flux:button>
+                                    @endif
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            @else
+                <flux:text>{{ __('No assets found for current filters.') }}</flux:text>
+            @endif
 
             <div class="mt-4">
                 {{ $this->assets->links() }}
@@ -331,19 +325,3 @@ new class extends Component {
         </div>
     </div>
 </section>
-
-<script>
-    window.addEventListener('gallery-url-copied', async (event) => {
-        const url = event?.detail?.url;
-
-        if (typeof url !== 'string' || url.length === 0) {
-            return;
-        }
-
-        try {
-            await navigator.clipboard.writeText(url);
-        } catch (error) {
-            console.error('Clipboard copy failed', error);
-        }
-    });
-</script>
