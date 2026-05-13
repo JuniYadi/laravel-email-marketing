@@ -49,10 +49,16 @@ it('lists uploaded assets on gallery page', function (): void {
         'kind' => MediaAsset::KIND_IMAGE,
     ]);
 
+    $this->get(route('gallery.index'))
+        ->assertOk()
+        ->assertDontSee('<table', false)
+        ->assertSee('xl:grid-cols-3', false);
+
     Livewire::test('pages::gallery.index')
         ->assertSee('hero-banner.png')
         ->assertSee('Image')
-        ->assertSee('Copy URL');
+        ->assertSee('Copy URL')
+        ->assertSee('https://cdn.example.com/gallery-assets/hero-banner.png', false);
 });
 
 it('filters gallery assets by kind', function (): void {
@@ -89,7 +95,9 @@ it('filters gallery assets by kind', function (): void {
         ->assertDontSee('brochure.pdf')
         ->set('kindFilter', MediaAsset::KIND_PDF)
         ->assertSee('brochure.pdf')
-        ->assertDontSee('visual.png');
+        ->assertDontSee('visual.png')
+        ->assertSee('<iframe', false)
+        ->assertSee('https://cdn.example.com/gallery-assets/brochure.pdf#page=1', false);
 });
 
 it('searches gallery assets by original name and external id', function (): void {
