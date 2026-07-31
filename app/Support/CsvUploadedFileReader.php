@@ -17,6 +17,10 @@ class CsvUploadedFileReader
             return [];
         }
 
+        if (! mb_check_encoding($contents, 'UTF-8')) {
+            $contents = mb_convert_encoding($contents, 'UTF-8', 'Windows-1252');
+        }
+
         $lines = preg_split('/\r\n|\n|\r/', rtrim($contents));
 
         if (! is_array($lines) || $lines === []) {
