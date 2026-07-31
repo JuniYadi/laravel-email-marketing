@@ -37,3 +37,25 @@ it('reads csv rows even when getRealPath is not a local readable path', function
 
     @unlink($path);
 });
+
+it('converts non-utf8 bytes to valid utf-8', function () {
+    $csv = "email,firstName,lastName\n";
+    $csv .= "dahliyahja@gmail.com,Dahliyah Ja\x92Anih,\n";
+
+    $path = tempnam(sys_get_temp_dir(), 'csv-upload-');
+
+    if ($path === false) {
+        throw new RuntimeException('Unable to create temporary file.');
+    }
+
+    file_put_contents($path, $csv);
+
+    $uploadedFile = new UploadedFile($path, 'contacts.csv', 'text/csv', null, true);
+
+    $rows = CsvUploadedFileReader::readRows($uploadedFile);
+
+    expect(mb_check_encoding($rows[1][1], 'UTF-8'))->toBeTrue()
+        ->and($rows[1][1])->toBe("Dahliyah Ja\u{2019}Anih");
+
+    @unlink($path);
+});
