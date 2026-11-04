@@ -8,6 +8,10 @@
 #   docker-compose -f docker-compose.dev.yml up -d
 #   docker-compose -f docker-compose.dev.yml down
 #
+# Composer/npm/tests on PHP 8.5 (same as production), without a local PHP:
+#   docker compose -f docker-compose.dev.yml run --rm toolbox composer update <pkg> -W
+#   docker compose -f docker-compose.dev.yml run --rm toolbox composer test
+#
 # Access phpMyAdmin: http://localhost:8085
 # Login: marketing / secret
 
@@ -51,6 +55,22 @@ services:
         condition: service_healthy
     networks:
       - dev-network
+
+  toolbox:
+    profiles: ["tools"]
+    build:
+      dockerfile_inline: |
+        FROM composer:2
+        COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
+        RUN install-php-extensions intl gd bcmath && apk add --no-cache nodejs npm
+    working_dir: /app
+    environment:
+      # own compiled-view cache: host caches hold host absolute paths
+      VIEW_COMPILED_PATH: /tmp/views
+    volumes:
+      - .:/app
+      # keep Linux node_modules separate from the host's (native binaries differ)
+      - /app/node_modules
 
 volumes:
   mariadb_dev_data:
