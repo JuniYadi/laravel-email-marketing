@@ -15,7 +15,6 @@ mkdir -p /var/www/html/storage/logs
 mkdir -p /var/www/html/bootstrap/cache
 
 chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache || true
 
 if [ -n "$DB_HOST" ] && [ -n "$DB_PORT" ]; then
     echo "Waiting for database at ${DB_HOST}:${DB_PORT}..."
@@ -50,4 +49,5 @@ if [ "${APP_ENV:-production}" = "production" ]; then
     php artisan view:cache || true
 fi
 
-echo "Starting Laravel Marketing Mail with php-base runtime..."
+echo "Starting Laravel Marketing Mail..."
+exec /usr/local/bin/entrypoint.sh "$@"
