@@ -1,11 +1,11 @@
 <?php
 
-it('uses a valid cron.d scheduler entry with explicit user and working directory', function () {
-    $cronFilePath = dirname(__DIR__, 2).'/docker/laravel-scheduler';
-    $cronFile = file_get_contents($cronFilePath);
+it('runs the Laravel scheduler as a supervisor program instead of cron.d', function () {
+    $root = dirname(__DIR__, 2);
+    $services = file_get_contents($root.'/docker/supervisor/app-services.conf');
 
-    expect($cronFile)->not->toBeFalse()
-        ->and($cronFile)->toContain('SHELL=/bin/sh')
-        ->and($cronFile)->toContain('PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
-        ->and($cronFile)->toContain('* * * * * www-data cd /var/www/html && /usr/local/bin/php artisan schedule:run --no-interaction >> /proc/1/fd/1 2>&1');
+    expect(file_exists($root.'/docker/laravel-scheduler'))->toBeFalse()
+        ->and($services)->toContain('[program:scheduler]')
+        ->and($services)->toContain('command=php /var/www/html/artisan schedule:work --no-interaction')
+        ->and($services)->toContain('directory=/var/www/html');
 });
