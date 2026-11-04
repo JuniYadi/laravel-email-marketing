@@ -13,7 +13,7 @@ services:
     container_name: marketing-mail-app
     restart: unless-stopped
     ports:
-      - "8084:80"
+      - "8084:8080"
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
@@ -34,14 +34,8 @@ services:
       # - FILESYSTEM_DISK=s3
       # - MAIL_MAILER=ses
       # - MAIL_FROM_ADDRESS=noreply@yourdomain.com
-      # php-base extensions
-      - PHP_EXT_bcmath=1
-      - PHP_EXT_pgsql=1
-      - PHP_EXT_pdo_pgsql=1
       # Optional: Run migrations on startup
       - RUN_MIGRATIONS=true
-      # Trust Cloudflare proxy - enables real IP forwarding in nginx
-      - NGINX_TRUST_CLOUDFLARE=1
     volumes:
       - ./storage:/var/www/html/storage
     depends_on:
