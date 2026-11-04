@@ -39,26 +39,35 @@ COPY . .
 # Build frontend assets
 RUN npm run build
 
-# Clear bootstrap cache
-RUN rm -rf bootstrap/cache/*.php
+# Clear bootstrap cache and drop build-only node_modules from the runtime image
+RUN rm -rf bootstrap/cache/*.php node_modules
 
 # ===============================================
-# Stage 2: Production (using php-base)
+# Stage 2: Production (pfnapp PHP base: Alpine, non-root UID 10001, port 8080)
 # ===============================================
-FROM ghcr.io/juniyadi/php-base:8.5
+FROM ghcr.io/pfnapp/base/languages/php:8.5
+
+USER root
+
+# pfnapp base ships pdo_mysql only; this app runs on PostgreSQL
+COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions pgsql pdo_pgsql \
+    && rm /usr/local/bin/install-php-extensions
 
 WORKDIR /var/www/html
 
-# Enable required extensions via environment variables
-ENV PHP_EXT_bcmath=1
-ENV PHP_EXT_pgsql=1
-ENV PHP_EXT_pdo_pgsql=1
-
-# Trust Cloudflare proxy - enables real IP forwarding in nginx
-ENV NGINX_TRUST_CLOUDFLARE=1
-
 # Copy built application from builder
-COPY --from=builder --chown=www-data:www-data /app /var/www/html
+COPY --from=builder --chown=10001:10001 /app /var/www/html
+
+# Base supervisord.conf has no include dir, so append queue + scheduler programs
+COPY docker/supervisor/app-services.conf /tmp/app-services.conf
+RUN cat /tmp/app-services.conf >> /etc/supervisor/supervisord.conf \
+    && rm /tmp/app-services.conf
+
+COPY --chown=10001:10001 docker/nginx/dynamic-routes.conf /etc/nginx/conf.d/custom/routes-laravel.conf
+COPY --chmod=755 docker/app-bootstrap.sh /usr/local/bin/app-bootstrap.sh
+
+USER 10001:10001
 
 # Set permissions for storage and cache
 RUN mkdir -p bootstrap/cache \
@@ -71,18 +80,13 @@ RUN mkdir -p bootstrap/cache \
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
-    NGINX_DOCROOT=/var/www/html/public \
-    NGINX_FRONT_CONTROLLER="/index.php?\$query_string" \
     PHP_MEMORY_LIMIT=256M \
-    PHP_UPLOAD_LIMIT=64M \
-    APP_BOOTSTRAP_CMD="if [ \"\$RUN_MIGRATIONS\" = \"true\" ]; then php artisan migrate --force; fi && php artisan config:cache || true && php artisan route:cache || true && php artisan view:cache || true"
+    PHP_UPLOAD_MAX_FILESIZE=64M
 
-# Copy app-specific Supervisor programs (php-base keeps core supervisord config)
-COPY docker/supervisor/app-services.conf /etc/supervisor.d/app-services.conf
-COPY docker/nginx/dynamic-routes.conf /etc/nginx/snippets/dynamic-routes.conf
-COPY docker/laravel-scheduler /etc/cron.d/laravel-scheduler
+EXPOSE 8080
 
-EXPOSE 80
+# Runs migrations/caches, then hands off to the base entrypoint (supervisord)
+ENTRYPOINT ["/usr/local/bin/app-bootstrap.sh"]
 
 # OCI image description
 LABEL org.opencontainers.image.description="${DESCRIPTION:-Laravel Marketing Mail Application}"
